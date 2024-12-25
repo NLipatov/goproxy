@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  proxy:
+    build:
+      context: ./src
+    image: goproxy:latest
+    container_name: proxy
+    ports:
+      - "8888:8888"
+    environment:
+      - PORT=8888
