@@ -26,3 +26,5 @@ go.work.sum
 /.idea/modules.xml
 /.idea/vcs.xml
 /.idea/goproxy.iml
+/.idea/dataSources.xml
+/.idea/sqldialects.xml

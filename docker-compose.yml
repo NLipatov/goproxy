@@ -1,6 +1,16 @@
-version: '3.8'
-
 services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: m1E416AwQv0sXsijwcx53o41pk2EXnvd
+      POSTGRES_DB: proxydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   proxy:
     build:
       context: ./src
@@ -10,3 +20,8 @@ services:
       - "8888:8888"
     environment:
       - PORT=8888
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
