@@ -20,18 +20,18 @@ func handleConnection(clientConn net.Conn) {
 	reader := bufio.NewReader(clientConn)
 	requestLine, err := reader.ReadString('\n')
 	if err != nil {
-		log.Println("Ошибка чтения запроса:", err)
+		log.Println("Could not read request:", err)
 		return
 	}
 
 	parts := strings.Fields(requestLine)
 	if len(parts) < 2 {
-		log.Println("Некорректный запрос")
+		log.Println("Invalid request")
 		return
 	}
 
 	method, target := parts[0], parts[1]
-	log.Printf("Метод: %s, Цель: %s\n", method, target)
+	log.Printf("Method: %s, Target: %s\n", method, target)
 
 	if method == "CONNECT" {
 		handleHttps(clientConn, target)
@@ -87,7 +87,7 @@ func handleHttp(clientConn net.Conn, reader *bufio.Reader) {
 
 	resp, err := http.ReadResponse(bufio.NewReader(serverConn), req)
 	if err != nil {
-		log.Println("Ошибка чтения ответа от сервера:", err)
+		log.Println("Could not read response:", err)
 		return
 	}
 	defer func(Body io.ReadCloser) {
@@ -98,20 +98,21 @@ func handleHttp(clientConn net.Conn, reader *bufio.Reader) {
 }
 
 func main() {
-	listener, err := net.Listen("tcp", ":8888")
+	port := ":8888"
+	listener, err := net.Listen("tcp", port)
 	if err != nil {
-		log.Fatal("Ошибка запуска сервера:", err)
+		log.Fatal("Could not start server:", err)
 	}
 	defer func(listener net.Listener) {
 		_ = listener.Close()
 	}(listener)
 
-	log.Println("Прокси-сервер запущен на порту 8888...")
+	log.Printf("Proxy listening on poort %s", port)
 
 	for {
-		clientConn, err := listener.Accept()
-		if err != nil {
-			log.Println("Ошибка подключения клиента:", err)
+		clientConn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			log.Printf("Failed serving client: %s", acceptErr)
 			continue
 		}
 		go handleConnection(clientConn)
