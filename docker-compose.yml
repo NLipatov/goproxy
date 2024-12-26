@@ -19,7 +19,11 @@ services:
     ports:
       - "8888:8888"
     environment:
-      - PORT=8888
+      - DB_USER=admin
+      - DB_PASS=m1E416AwQv0sXsijwcx53o41pk2EXnvd
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - HTTP_LISTENER_PORT=8888
     depends_on:
       - postgres
 

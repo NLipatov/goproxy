@@ -1,7 +1,7 @@
 package services
 
 import (
-	"0trace/Domain/ValueObjects"
+	"goproxy/Domain/ValueObjects"
 )
 
 type AuthService struct {

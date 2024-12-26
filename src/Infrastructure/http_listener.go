@@ -1,31 +1,31 @@
-package main
+package Infrastructure
 
 import (
-	"0trace/Application"
-	"0trace/Domain/ValueObjects"
-	"0trace/Infrastructure/services"
 	"bufio"
 	"encoding/base64"
 	"fmt"
+	"goproxy/Application"
+	"goproxy/Domain/ValueObjects"
+	"goproxy/Infrastructure/services"
 	"log"
 	"net"
 	"net/http"
 	"strings"
 )
 
-type httpListener struct {
+type HttpListener struct {
 	authService      Application.AuthService
 	httpProxyService Application.HttpProxyService
 }
 
-func newHttpListener() *httpListener {
-	return &httpListener{
+func NewHttpListener() *HttpListener {
+	return &HttpListener{
 		authService:      services.NewAuthService(),
 		httpProxyService: services.NewProxy(),
 	}
 }
 
-func (l *httpListener) servePort(port string) error {
+func (l *HttpListener) ServePort(port string) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		log.Fatal("Could not start server:", err)
@@ -76,7 +76,7 @@ func (l *httpListener) servePort(port string) error {
 	}
 }
 
-func (l *httpListener) ExtractCredentialsFromB64(encoded string) (*ValueObjects.BasicCredentials, error) {
+func (l *HttpListener) ExtractCredentialsFromB64(encoded string) (*ValueObjects.BasicCredentials, error) {
 	if encoded == "" {
 		return nil, fmt.Errorf("empty Base64 string")
 	}

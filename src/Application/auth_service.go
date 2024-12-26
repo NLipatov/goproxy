@@ -1,6 +1,6 @@
 package Application
 
-import "0trace/Domain/ValueObjects"
+import "goproxy/Domain/ValueObjects"
 
 type AuthService interface {
 	Authorize(credentials ValueObjects.Credentials) (bool, error)

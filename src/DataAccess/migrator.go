@@ -1,8 +1,7 @@
-package main
+package data_access
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,28 +10,19 @@ import (
 	"strings"
 )
 
-func main() {
-	dbUser := os.Getenv("DB_USER")
-	dbPass := os.Getenv("DB_PASS")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbDatabase := os.Getenv("DB_DATABASE")
-
-	if dbUser == "" || dbPass == "" || dbHost == "" || dbPort == "" || dbDatabase == "" {
-		log.Fatalf("Invalid db credentials")
+func Migrate() {
+	db, err := ConnectDB()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	dataSourceName := fmt.
-		Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", dbUser, dbPass, dbHost, dbPort, dbDatabase)
-
-	db := ConnectDB(dataSourceName)
 	defer func(db *sql.DB) {
 		_ = db.Close()
 	}(db)
 
 	appliedVersion := getAppliedVersion(db)
 
-	files, err := filepath.Glob("migrations/v*.sql")
+	files, err := filepath.Glob("DataAccess/migrations/v*.sql")
 	if err != nil {
 		log.Fatalf("Failed to read migration files: %s", err)
 	}
