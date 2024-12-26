@@ -24,3 +24,8 @@ func (authService *AuthService) Authorize(credentials ValueObjects.Credentials) 
 	}
 	return false, nil
 }
+
+func (authService *AuthService) Register(username, password string) error {
+	//TODO implement me
+	panic("implement me")
+}
