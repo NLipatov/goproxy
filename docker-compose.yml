@@ -17,7 +17,7 @@ services:
     image: goproxy:latest
     container_name: migrator
     environment:
-      - MODE=migrate
+      - MODE=migrator
       - DB_DATABASE=proxydb
       - DB_USER=admin
       - DB_PASS=m1E416AwQv0sXsijwcx53o41pk2EXnvd

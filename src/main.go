@@ -13,7 +13,7 @@ import (
 func main() {
 	mode := os.Getenv("MODE")
 	switch mode {
-	case "migrate":
+	case "migrator":
 		applyMigrations()
 	case "proxy":
 		startHttpProxy()
