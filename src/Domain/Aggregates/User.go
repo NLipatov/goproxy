@@ -9,7 +9,7 @@ type User struct {
 	passwordSalt ValueObjects.Salt
 }
 
-func NewUser(username string, hash, salt []byte) (User, error) {
+func NewUser(id int, username string, hash, salt []byte) (User, error) {
 	usernameObject, usernameErr := ValueObjects.NewUsernameFromString(username)
 	if usernameErr != nil {
 		return User{}, usernameErr
@@ -26,7 +26,7 @@ func NewUser(username string, hash, salt []byte) (User, error) {
 	}
 
 	return User{
-		id:           -1,
+		id:           id,
 		username:     usernameObject,
 		passwordHash: passwordHashObject,
 		passwordSalt: saltObject,
