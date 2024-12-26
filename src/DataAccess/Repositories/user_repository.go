@@ -15,7 +15,31 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (u *UserRepository) LoadById(id int) (Aggregates.User, error) {
+func (u *UserRepository) GetByUsername(username string) (Aggregates.User, error) {
+	var id int
+	var usernameResult string
+	var passwordHash, salt []byte
+
+	err := u.db.
+		QueryRow("SELECT id, username, password_hash, password_salt FROM public.users WHERE username = $1", username).
+		Scan(&id, &usernameResult, &passwordHash, &salt)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Aggregates.User{}, fmt.Errorf("user not found: %v", err)
+		}
+		return Aggregates.User{}, fmt.Errorf("could not load user: %v", err)
+	}
+
+	user, userErr := Aggregates.NewUser(id, username, passwordHash, salt)
+	if userErr != nil {
+		return Aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
+	}
+
+	return user, nil
+}
+
+func (u *UserRepository) GetById(id int) (Aggregates.User, error) {
 	var username string
 	var passwordHash, salt []byte
 
@@ -38,28 +62,12 @@ func (u *UserRepository) LoadById(id int) (Aggregates.User, error) {
 	return user, nil
 }
 
-func (u *UserRepository) LoadByUsername(username string) (Aggregates.User, error) {
+func (u *UserRepository) Create(user Aggregates.User) (int, error) {
 	var id int
-	var usernameResult string
-	var passwordHash, salt []byte
-
-	err := u.db.
-		QueryRow("SELECT id, username, password_hash, password_salt FROM public.users WHERE username = $1", username).
-		Scan(&id, &usernameResult, &passwordHash, &salt)
-
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return Aggregates.User{}, fmt.Errorf("user not found: %v", err)
-		}
-		return Aggregates.User{}, fmt.Errorf("could not load user: %v", err)
-	}
-
-	user, userErr := Aggregates.NewUser(id, username, passwordHash, salt)
-	if userErr != nil {
-		return Aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
-	}
-
-	return user, nil
+	err := u.db.QueryRow("INSERT INTO public.users (username, password_hash, password_salt) VALUES ($1, $2, $3) RETURNING id",
+		user.Username(), user.PasswordHash(), user.PasswordSalt(),
+	).Scan(&id)
+	return id, err
 }
 
 func (u *UserRepository) Update(user Aggregates.User) error {

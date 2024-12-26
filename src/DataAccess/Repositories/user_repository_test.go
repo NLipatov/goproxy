@@ -20,53 +20,50 @@ func TestUserRepository(t *testing.T) {
 
 	repo := NewUserRepository(db)
 
-	t.Run("LoadByUsername", func(t *testing.T) {
-		userId := insertTestUser(db, t)
-		user, err := repo.LoadById(userId)
+	t.Run("GetByUsername", func(t *testing.T) {
+		userId := insertTestUser(repo, t)
+		user, err := repo.GetById(userId)
 		assertNoError(t, err, "Failed to load user by id")
-		loadedUser, err := repo.LoadByUsername(user.Username())
+		loadedUser, err := repo.GetByUsername(user.Username())
 		assertNoError(t, err, "Failed to load user by username")
 		assertUsersEqual(t, user, loadedUser)
 	})
 
-	t.Run("LoadById", func(t *testing.T) {
-		userId := insertTestUser(db, t)
-		user, err := repo.LoadById(userId)
+	t.Run("GetById", func(t *testing.T) {
+		userId := insertTestUser(repo, t)
+		user, err := repo.GetById(userId)
 		assertNoError(t, err, "Failed to load user by id")
-		loadedUser, err := repo.LoadById(user.Id())
+		loadedUser, err := repo.GetById(user.Id())
 		assertNoError(t, err, "Failed to load user by ID")
 		assertUsersEqual(t, user, loadedUser)
 	})
 
 	t.Run("Insert", func(t *testing.T) {
-		userId := insertTestUser(db, t)
-		user, err := repo.LoadById(userId)
+		userId := insertTestUser(repo, t)
+		user, err := repo.GetById(userId)
 		assertNoError(t, err, "Failed to load user by id")
-		loadedUser, err := repo.LoadByUsername(user.Username())
+		loadedUser, err := repo.GetByUsername(user.Username())
 		assertNoError(t, err, "Failed to load inserted user")
 		assertUsersEqual(t, user, loadedUser)
 	})
 
 	t.Run("Update", func(t *testing.T) {
-		userId := insertTestUser(db, t)
-		user, err := repo.LoadById(userId)
+		userId := insertTestUser(repo, t)
+		user, err := repo.GetById(userId)
 		assertNoError(t, err, "Failed to load user by id")
 		updatedUser, _ := Aggregates.NewUser(userId, "updated_user", []byte("new_hash"), []byte("new_salt"))
 		assertNoError(t, repo.Update(updatedUser), "Failed to update user")
-		loadedUser, err := repo.LoadById(user.Id())
+		loadedUser, err := repo.GetById(user.Id())
 		assertNoError(t, err, "Failed to load updated user")
 		assertUsersNotEqual(t, user, loadedUser)
 	})
 }
 
-func insertTestUser(db *sql.DB, t *testing.T) int {
+func insertTestUser(repo *UserRepository, t *testing.T) int {
 	username := fmt.Sprintf("test_user_%d", time.Now().UnixNano())
 	user, err := Aggregates.NewUser(-1, username, []byte("hashed_password"), []byte("salt"))
 	assertNoError(t, err, "Failed to create test user aggregate")
-	var id int
-	err = db.QueryRow("INSERT INTO public.users (username, password_hash, password_salt) VALUES ($1, $2, $3) RETURNING id",
-		user.Username(), user.PasswordHash(), user.PasswordSalt(),
-	).Scan(&id)
+	id, err := repo.Create(user)
 	assertNoError(t, err, "Failed to insert test user")
 	return id
 }
