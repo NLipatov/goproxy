@@ -34,7 +34,7 @@ func (l *HttpListener) ServePort(port string) error {
 		_ = listener.Close()
 	}(listener)
 
-	log.Printf("Serving port %s", port)
+	log.Printf("Proxy is serving port %s", port)
 
 	for {
 		clientConn, acceptErr := listener.Accept()
