@@ -10,7 +10,7 @@ COPY . ./
 
 # Download dependencies
 RUN go mod download
-RUN go build -o main ./Infrastructure/main
+RUN go build -o main
 
 # Run
 CMD ["./main"]
