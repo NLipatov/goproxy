@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,14 +14,13 @@ import (
 func Migrate(db *sql.DB) {
 	appliedVersion := getAppliedVersion(db)
 
-	currentDir, err := os.Getwd()
-	if err != nil {
-		log.Fatalf("Failed to get current working directory: %v", err)
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		log.Fatalf("Failed to get current file path")
 	}
+	migrationsDir := filepath.Join(filepath.Dir(filename), "migrations", "v*.sql")
 
-	migrationsPath := filepath.Join(currentDir, "migrations", "v*.sql")
-
-	files, err := filepath.Glob(migrationsPath)
+	files, err := filepath.Glob(migrationsDir)
 	if err != nil {
 		log.Fatalf("Failed to read migration files: %s", err)
 	}
