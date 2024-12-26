@@ -11,6 +11,21 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  migrator:
+    build:
+      context: ./src
+    image: goproxy:latest
+    container_name: migrator
+    environment:
+      - MODE=migrate
+      - DB_DATABASE=proxydb
+      - DB_USER=admin
+      - DB_PASS=m1E416AwQv0sXsijwcx53o41pk2EXnvd
+      - DB_HOST=postgres
+      - DB_PORT=5432
+    depends_on:
+      - postgres
+
   proxy:
     build:
       context: ./src
@@ -19,13 +34,33 @@ services:
     ports:
       - "8888:8888"
     environment:
+      - MODE=proxy
+      - DB_DATABASE=proxydb
       - DB_USER=admin
       - DB_PASS=m1E416AwQv0sXsijwcx53o41pk2EXnvd
       - DB_HOST=postgres
       - DB_PORT=5432
       - HTTP_LISTENER_PORT=8888
     depends_on:
-      - postgres
+      - migrator
+
+  rest-api:
+    build:
+      context: ./src
+    image: goproxy:latest
+    container_name: rest-api
+    ports:
+      - "80:80"
+    environment:
+      - MODE=rest-api
+      - DB_DATABASE=proxydb
+      - DB_USER=admin
+      - DB_PASS=m1E416AwQv0sXsijwcx53o41pk2EXnvd
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - HTTP_REST_API_PORT=80
+    depends_on:
+      - migrator
 
 volumes:
   postgres_data:
