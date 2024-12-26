@@ -1,4 +1,4 @@
-package Repositrories
+package Repositories
 
 import (
 	"database/sql"
@@ -15,14 +15,13 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (u *UserRepository) Load(username string) (Aggregates.User, error) {
-	var id int
-	var usernameResult string
+func (u *UserRepository) LoadById(id int) (Aggregates.User, error) {
+	var username string
 	var passwordHash, salt []byte
 
 	err := u.db.
-		QueryRow("SELECT id, username, password_hash, password_salt FROM public.users WHERE username = $1", id, username).
-		Scan(&usernameResult, &passwordHash, &salt)
+		QueryRow("SELECT id, username, password_hash, password_salt FROM public.users WHERE id = $1", id).
+		Scan(&id, &username, &passwordHash, &salt)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -31,7 +30,31 @@ func (u *UserRepository) Load(username string) (Aggregates.User, error) {
 		return Aggregates.User{}, fmt.Errorf("could not load user: %v", err)
 	}
 
-	user, userErr := Aggregates.NewUser(username, passwordHash, salt)
+	user, userErr := Aggregates.NewUser(id, username, passwordHash, salt)
+	if userErr != nil {
+		return Aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
+	}
+
+	return user, nil
+}
+
+func (u *UserRepository) LoadByUsername(username string) (Aggregates.User, error) {
+	var id int
+	var usernameResult string
+	var passwordHash, salt []byte
+
+	err := u.db.
+		QueryRow("SELECT id, username, password_hash, password_salt FROM public.users WHERE username = $1", username).
+		Scan(&id, &usernameResult, &passwordHash, &salt)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Aggregates.User{}, fmt.Errorf("user not found: %v", err)
+		}
+		return Aggregates.User{}, fmt.Errorf("could not load user: %v", err)
+	}
+
+	user, userErr := Aggregates.NewUser(id, username, passwordHash, salt)
 	if userErr != nil {
 		return Aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
 	}
