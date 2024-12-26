@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	data_access "goproxy/DataAccess"
 	"goproxy/Infrastructure"
 	"log"
@@ -10,7 +11,15 @@ import (
 func main() {
 	args := os.Args[1:]
 	if len(args) == 1 && args[0] == "migrate" {
-		data_access.Migrate()
+		db, err := data_access.ConnectDB()
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer func(db *sql.DB) {
+			_ = db.Close()
+		}(db)
+
+		data_access.Migrate(db)
 		return
 	}
 

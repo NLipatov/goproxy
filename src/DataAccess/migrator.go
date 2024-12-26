@@ -10,19 +10,17 @@ import (
 	"strings"
 )
 
-func Migrate() {
-	db, err := ConnectDB()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	defer func(db *sql.DB) {
-		_ = db.Close()
-	}(db)
-
+func Migrate(db *sql.DB) {
 	appliedVersion := getAppliedVersion(db)
 
-	files, err := filepath.Glob("DataAccess/migrations/v*.sql")
+	currentDir, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Failed to get current working directory: %v", err)
+	}
+
+	migrationsPath := filepath.Join(currentDir, "migrations", "v*.sql")
+
+	files, err := filepath.Glob(migrationsPath)
 	if err != nil {
 		log.Fatalf("Failed to read migration files: %s", err)
 	}
