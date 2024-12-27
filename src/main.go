@@ -6,6 +6,7 @@ import (
 	data_access "goproxy/DataAccess"
 	"goproxy/DataAccess/Repositories"
 	"goproxy/Infrastructure"
+	"goproxy/Infrastructure/services"
 	"log"
 	"os"
 )
@@ -65,7 +66,9 @@ func startHttpRestApi() {
 	}
 
 	userRepository := Repositories.NewUserRepository(db)
-	useCases := Application.NewUserUseCases(userRepository)
+	cryptoService := services.NewCryptoService(32)
+	useCases := Application.NewUserUseCases(userRepository, cryptoService)
+
 	restApiListener := Infrastructure.NewHttpRestApiListener(useCases)
 	err = restApiListener.ServePort(port)
 	if err != nil {
