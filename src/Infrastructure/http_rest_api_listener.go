@@ -15,10 +15,10 @@ import (
 )
 
 type HttpRestApiListener struct {
-	userUseCases Application.UserUseCases
+	userUseCases Application.UserUseCasesContract
 }
 
-func NewHttpRestApiListener(useCases Application.UserUseCases) *HttpRestApiListener {
+func NewHttpRestApiListener(useCases Application.UserUseCasesContract) *HttpRestApiListener {
 	return &HttpRestApiListener{
 		userUseCases: useCases,
 	}

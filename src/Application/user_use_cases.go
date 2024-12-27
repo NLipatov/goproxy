@@ -8,6 +8,13 @@ import (
 	"strings"
 )
 
+type UserUseCasesContract interface {
+	GetById(id int) (Aggregates.User, error)
+	Create(command Commands.PostUserCommand) (int, error)
+	Update(entity Aggregates.User) error
+	Delete(dto Commands.DeleteUserCommand) error
+}
+
 type UserUseCases struct {
 	repo          Repository[Aggregates.User]
 	cryptoService CryptoService
