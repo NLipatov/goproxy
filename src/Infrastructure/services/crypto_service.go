@@ -4,13 +4,14 @@ import (
 	"crypto/rand"
 	"errors"
 	"golang.org/x/crypto/bcrypt"
+	"goproxy/Application"
 )
 
 type CryptoService struct {
 	saltLength int
 }
 
-func NewCryptoService(saltLength int) *CryptoService {
+func NewCryptoService(saltLength int) Application.CryptoService {
 	return &CryptoService{
 		saltLength: saltLength,
 	}
@@ -25,8 +26,8 @@ func (c *CryptoService) GenerateSalt() ([]byte, error) {
 	return salt, nil
 }
 
-func (c *CryptoService) HashValue(value, salt string) ([]byte, error) {
-	saltedValue := value + salt
+func (c *CryptoService) HashValue(value string, salt []byte) ([]byte, error) {
+	saltedValue := value + string(salt)
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(saltedValue), bcrypt.DefaultCost)
 	if err != nil {
@@ -36,8 +37,8 @@ func (c *CryptoService) HashValue(value, salt string) ([]byte, error) {
 	return hash, nil
 }
 
-func (c *CryptoService) ValidateHash(value string, salt, hash []byte) bool {
-	saltedValue := append([]byte(value), salt...)
-	err := bcrypt.CompareHashAndPassword(hash, saltedValue)
+func (c *CryptoService) ValidateHash(hash []byte, salt []byte, password string) bool {
+	saltedValue := password + string(salt)
+	err := bcrypt.CompareHashAndPassword(hash, []byte(saltedValue))
 	return err == nil
 }
