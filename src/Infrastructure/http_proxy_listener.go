@@ -14,14 +14,14 @@ import (
 )
 
 type HttpListener struct {
-	authService      Application.AuthService
+	authUseCases     Application.AuthUseCases
 	httpProxyService Application.HttpProxyService
 }
 
-func NewHttpListener() *HttpListener {
+func NewHttpListener(authUseCases Application.AuthUseCases) *HttpListener {
 	return &HttpListener{
-		authService:      services.NewAuthService(),
 		httpProxyService: services.NewProxy(),
+		authUseCases:     authUseCases,
 	}
 }
 
@@ -62,7 +62,7 @@ func (l *HttpListener) ServePort(port string) error {
 			continue
 		}
 
-		isCredentialsValid, authorizationErr := l.authService.Authorize(credentials)
+		isCredentialsValid, authorizationErr := l.authUseCases.Authorize(credentials)
 		if authorizationErr != nil {
 			log.Printf("Could not authorize: %v", authorizationErr)
 			continue

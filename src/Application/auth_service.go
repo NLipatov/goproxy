@@ -1,8 +1,10 @@
 package Application
 
-import "goproxy/Domain/ValueObjects"
+import (
+	"goproxy/Domain/Aggregates"
+	"goproxy/Domain/ValueObjects"
+)
 
 type AuthService interface {
-	Authorize(credentials ValueObjects.Credentials) (bool, error)
-	Register(username, password string) error
+	AuthorizeBasic(user Aggregates.User, credentials ValueObjects.BasicCredentials) (bool, error)
 }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"goproxy/Application"
-	"goproxy/Application/Queries"
 	"goproxy/Infrastructure/DTO"
 	"io"
 	"log"
@@ -93,7 +92,7 @@ func (l *HttpRestApiListener) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dto := Queries.FromUser(user)
+	dto := DTO.FromUser(user)
 	serialized, err := json.Marshal(dto)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "")

@@ -1,31 +1,27 @@
 package services
 
 import (
+	"fmt"
+	"goproxy/Application"
+	"goproxy/Domain/Aggregates"
 	"goproxy/Domain/ValueObjects"
 )
 
 type AuthService struct {
+	cryptoService Application.CryptoService
 }
 
-func NewAuthService() *AuthService {
-	return &AuthService{}
-}
-
-func (authService *AuthService) Authorize(credentials ValueObjects.Credentials) (bool, error) {
-	//ToDo: implement auth check
-	if credentials.Type() == ValueObjects.Basic {
-		bCredentials, ok := credentials.(*ValueObjects.BasicCredentials)
-		if !ok {
-			return false, nil
-		}
-		if bCredentials.Username == "admin" && bCredentials.Password == "admin" {
-			return true, nil
-		}
+func NewAuthService(cryptoService Application.CryptoService) *AuthService {
+	return &AuthService{
+		cryptoService: cryptoService,
 	}
-	return false, nil
 }
 
-func (authService *AuthService) Register(username, password string) error {
-	//TODO implement me
-	panic("implement me")
+func (authService *AuthService) AuthorizeBasic(user Aggregates.User, credentials ValueObjects.BasicCredentials) (bool, error) {
+	isPasswordValid := authService.cryptoService.ValidateHash(user.PasswordHash(), user.PasswordSalt(), credentials.Password)
+	if !isPasswordValid {
+		return false, fmt.Errorf("invalid credentials")
+	}
+
+	return true, nil
 }

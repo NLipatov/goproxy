@@ -44,8 +44,21 @@ func startHttpProxy() {
 		log.Fatalf("'HTTP_LISTENER_PORT' env var must be set")
 	}
 
-	listener := Infrastructure.NewHttpListener()
-	err := listener.ServePort(port)
+	db, err := data_access.ConnectDB()
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	userRepository := Repositories.NewUserRepository(db)
+	cryptoService := services.NewCryptoService(32)
+	authService := services.NewAuthService(cryptoService)
+	authUseCases := Application.NewAuthUseCases(authService, userRepository)
+
+	listener := Infrastructure.NewHttpListener(authUseCases)
+	err = listener.ServePort(port)
 	if err != nil {
 		log.Printf("Failed serving port: %v", err)
 	}

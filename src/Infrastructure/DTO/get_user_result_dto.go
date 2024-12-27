@@ -1,4 +1,4 @@
-package Queries
+package DTO
 
 import "goproxy/Domain/Aggregates"
 

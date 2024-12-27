@@ -16,11 +16,11 @@ type UserUseCasesContract interface {
 }
 
 type UserUseCases struct {
-	repo          Repository[Aggregates.User]
+	repo          UserRepository
 	cryptoService CryptoService
 }
 
-func NewUserUseCases(repo Repository[Aggregates.User], cryptoService CryptoService) UserUseCases {
+func NewUserUseCases(repo UserRepository, cryptoService CryptoService) UserUseCases {
 	return UserUseCases{
 		repo:          repo,
 		cryptoService: cryptoService,
