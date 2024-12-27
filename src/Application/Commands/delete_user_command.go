@@ -1,6 +1,6 @@
 package Commands
 
-type DeleteUserDTO struct {
+type DeleteUserCommand struct {
 	Id       string
 	Password string
 }
