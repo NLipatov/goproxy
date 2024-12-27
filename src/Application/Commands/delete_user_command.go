@@ -1,6 +1,8 @@
 package Commands
 
+import "goproxy/Domain/ValueObjects"
+
 type DeleteUserCommand struct {
 	Id       string
-	Password string
+	Password ValueObjects.Password
 }

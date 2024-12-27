@@ -1,6 +1,8 @@
 package Commands
 
+import "goproxy/Domain/ValueObjects"
+
 type PostUserCommand struct {
 	Username string
-	Password string
+	Password ValueObjects.Password
 }
