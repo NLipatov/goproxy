@@ -1,4 +1,4 @@
-package DTOs
+package Commands
 
 type DeleteUserDTO struct {
 	Id       string

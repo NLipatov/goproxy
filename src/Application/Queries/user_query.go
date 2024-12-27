@@ -1,14 +1,14 @@
-package DTOs
+package Queries
 
 import "goproxy/Domain/Aggregates"
 
-type GetUserDTO struct {
+type GetUserQuery struct {
 	Id       int
 	Username string
 }
 
-func FromUser(user Aggregates.User) GetUserDTO {
-	return GetUserDTO{
+func FromUser(user Aggregates.User) GetUserQuery {
+	return GetUserQuery{
 		Id:       user.Id(),
 		Username: user.Username(),
 	}
