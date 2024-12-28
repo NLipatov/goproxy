@@ -18,7 +18,12 @@ func TestUserRepository(t *testing.T) {
 		_ = db.Close()
 	}(db)
 
-	repo := NewUserRepository(db)
+	cache, err := NewBigCacheUserRepositoryCache(15*time.Minute, 5*time.Minute, 16, 512)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repo := NewUserRepository(db, cache)
 
 	t.Run("GetByUsername", func(t *testing.T) {
 		userId := insertTestUser(repo, t)

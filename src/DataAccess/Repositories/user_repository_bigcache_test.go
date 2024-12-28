@@ -30,8 +30,8 @@ func TestSetAndGet(t *testing.T) {
 }
 
 func TestTTLExpiration(t *testing.T) {
-	ttl := 500 * time.Millisecond
-	cleanInterval := 500 * time.Millisecond
+	ttl := 100 * time.Millisecond
+	cleanInterval := 100 * time.Millisecond
 	shards := 1024
 	maxEntrySize := 500
 
