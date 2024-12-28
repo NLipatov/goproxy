@@ -8,19 +8,28 @@ import (
 )
 
 type UserRepository struct {
-	db *sql.DB
+	db    *sql.DB
+	cache BigCacheUserRepositoryCache
 }
 
-func NewUserRepository(db *sql.DB) *UserRepository {
-	return &UserRepository{db: db}
+func NewUserRepository(db *sql.DB, cache BigCacheUserRepositoryCache) *UserRepository {
+	return &UserRepository{
+		db:    db,
+		cache: cache,
+	}
 }
 
 func (u *UserRepository) GetByUsername(username string) (Aggregates.User, error) {
+	cachedUser, err := u.cache.Get(username)
+	if err == nil {
+		return cachedUser, nil
+	}
+
 	var id int
 	var usernameResult string
 	var passwordHash, salt []byte
 
-	err := u.db.
+	err = u.db.
 		QueryRow("SELECT id, username, password_hash, password_salt FROM public.users WHERE username = $1", username).
 		Scan(&id, &usernameResult, &passwordHash, &salt)
 
@@ -35,6 +44,8 @@ func (u *UserRepository) GetByUsername(username string) (Aggregates.User, error)
 	if userErr != nil {
 		return Aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
 	}
+
+	_ = u.cache.Set(username, user)
 
 	return user, nil
 }

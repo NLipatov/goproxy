@@ -9,6 +9,7 @@ import (
 	"goproxy/Infrastructure/services"
 	"log"
 	"os"
+	"time"
 )
 
 func main() {
@@ -52,7 +53,12 @@ func startHttpProxy() {
 		log.Fatal(err)
 	}
 
-	userRepository := Repositories.NewUserRepository(db)
+	cache, err := createBigcacheInstance()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	userRepository := Repositories.NewUserRepository(db, cache)
 	cryptoService := services.NewCryptoService(32)
 	authService := services.NewAuthService(cryptoService)
 	authUseCases := Application.NewAuthUseCases(authService, userRepository)
@@ -78,7 +84,12 @@ func startHttpRestApi() {
 		log.Fatal(err)
 	}
 
-	userRepository := Repositories.NewUserRepository(db)
+	cache, err := createBigcacheInstance()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	userRepository := Repositories.NewUserRepository(db, cache)
 	cryptoService := services.NewCryptoService(32)
 	useCases := Application.NewUserUseCases(userRepository, cryptoService)
 
@@ -87,4 +98,8 @@ func startHttpRestApi() {
 	if err != nil {
 		log.Printf("Failed serving port: %v", err)
 	}
+}
+
+func createBigcacheInstance() (Repositories.BigCacheUserRepositoryCache, error) {
+	return Repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
 }
