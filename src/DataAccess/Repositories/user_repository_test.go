@@ -23,16 +23,16 @@ func TestUserRepository(t *testing.T) {
 	t.Run("GetByUsername", func(t *testing.T) {
 		userId := insertTestUser(repo, t)
 		user, err := repo.GetById(userId)
-		assertNoError(t, err, "Failed to load user by id")
+		assertNoError(t, err, "Failed to load user by Id")
 		loadedUser, err := repo.GetByUsername(user.Username())
-		assertNoError(t, err, "Failed to load user by username")
+		assertNoError(t, err, "Failed to load user by Username")
 		assertUsersEqual(t, user, loadedUser)
 	})
 
 	t.Run("GetById", func(t *testing.T) {
 		userId := insertTestUser(repo, t)
 		user, err := repo.GetById(userId)
-		assertNoError(t, err, "Failed to load user by id")
+		assertNoError(t, err, "Failed to load user by Id")
 		loadedUser, err := repo.GetById(user.Id())
 		assertNoError(t, err, "Failed to load user by ID")
 		assertUsersEqual(t, user, loadedUser)
@@ -41,7 +41,7 @@ func TestUserRepository(t *testing.T) {
 	t.Run("Insert", func(t *testing.T) {
 		userId := insertTestUser(repo, t)
 		user, err := repo.GetById(userId)
-		assertNoError(t, err, "Failed to load user by id")
+		assertNoError(t, err, "Failed to load user by Id")
 		loadedUser, err := repo.GetByUsername(user.Username())
 		assertNoError(t, err, "Failed to load inserted user")
 		assertUsersEqual(t, user, loadedUser)
@@ -50,7 +50,7 @@ func TestUserRepository(t *testing.T) {
 	t.Run("Update", func(t *testing.T) {
 		userId := insertTestUser(repo, t)
 		user, err := repo.GetById(userId)
-		assertNoError(t, err, "Failed to load user by id")
+		assertNoError(t, err, "Failed to load user by Id")
 		updatedUser, _ := Aggregates.NewUser(userId, "updated_user", []byte("new_hash"), []byte("new_salt"))
 		assertNoError(t, repo.Update(updatedUser), "Failed to update user")
 		loadedUser, err := repo.GetById(user.Id())
@@ -76,7 +76,7 @@ func assertNoError(t *testing.T, err error, message string) {
 
 func assertUsersEqual(t *testing.T, expected, actual Aggregates.User) {
 	if expected.Username() != actual.Username() {
-		t.Errorf("Expected username %s, got %s", expected.Username(), actual.Username())
+		t.Errorf("Expected Username %s, got %s", expected.Username(), actual.Username())
 	}
 	if !bytes.Equal(expected.PasswordHash(), actual.PasswordHash()) {
 		t.Errorf("Expected password hash %x, got %x", expected.PasswordHash(), actual.PasswordHash())
