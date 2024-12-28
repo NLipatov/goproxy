@@ -1,4 +1,4 @@
-name: tungo-workflow
+name: goproxy-workflow
 on:
   push:
     branches:
