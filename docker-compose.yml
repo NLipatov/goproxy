@@ -101,5 +101,19 @@ services:
       kafka-topics --bootstrap-server kafka:9092 --list
       "
 
+  kafka-relay:
+    build:
+      context: ./src
+    container_name: kafka-relay
+    environment:
+      - MODE=migrator
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+    depends_on:
+      - kafka
+
 volumes:
   postgres_data:

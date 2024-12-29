@@ -21,9 +21,15 @@ func main() {
 		startHttpProxy()
 	case "rest-api":
 		startHttpRestApi()
+	case "kafka-relay":
+		startKafkaRelay()
 	default:
 		log.Fatalf("Unsupported mode: %s", mode)
 	}
+}
+
+func startKafkaRelay() {
+	infrastructure.StartOutboxProcessing()
 }
 
 func applyMigrations() {
