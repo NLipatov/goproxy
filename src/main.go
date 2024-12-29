@@ -2,11 +2,11 @@ package main
 
 import (
 	"database/sql"
-	"goproxy/Application"
-	data_access "goproxy/DataAccess"
-	"goproxy/DataAccess/repositories"
-	"goproxy/Infrastructure"
-	"goproxy/Infrastructure/services"
+	"goproxy/application"
+	data_access "goproxy/dal"
+	"goproxy/dal/repositories"
+	"goproxy/infrastructure"
+	"goproxy/infrastructure/services"
 	"log"
 	"os"
 	"time"
@@ -61,9 +61,9 @@ func startHttpProxy() {
 	userRepository := repositories.NewUserRepository(db, cache)
 	cryptoService := services.NewCryptoService(32)
 	authService := services.NewAuthService(cryptoService)
-	authUseCases := Application.NewAuthUseCases(authService, userRepository)
+	authUseCases := application.NewAuthUseCases(authService, userRepository)
 
-	listener := Infrastructure.NewHttpListener(authUseCases)
+	listener := infrastructure.NewHttpListener(authUseCases)
 	err = listener.ServePort(port)
 	if err != nil {
 		log.Printf("Failed serving port: %v", err)
@@ -91,9 +91,9 @@ func startHttpRestApi() {
 
 	userRepository := repositories.NewUserRepository(db, cache)
 	cryptoService := services.NewCryptoService(32)
-	useCases := Application.NewUserUseCases(userRepository, cryptoService)
+	useCases := application.NewUserUseCases(userRepository, cryptoService)
 
-	restApiListener := Infrastructure.NewHttpRestApiListener(useCases)
+	restApiListener := infrastructure.NewHttpRestApiListener(useCases)
 	err = restApiListener.ServePort(port)
 	if err != nil {
 		log.Printf("Failed serving port: %v", err)
