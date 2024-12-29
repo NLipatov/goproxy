@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
-	"goproxy/dal"
 	"goproxy/domain/aggregates"
 	"testing"
 	"time"
@@ -73,12 +72,6 @@ func insertTestUser(repo *UserRepository, t *testing.T) int {
 	return id
 }
 
-func assertNoError(t *testing.T, err error, message string) {
-	if err != nil {
-		t.Fatalf("%s: %v", message, err)
-	}
-}
-
 func assertUsersEqual(t *testing.T, expected, actual aggregates.User) {
 	if expected.Username() != actual.Username() {
 		t.Errorf("Expected Username %s, got %s", expected.Username(), actual.Username())
@@ -101,11 +94,4 @@ func assertUsersNotEqual(t *testing.T, expected, actual aggregates.User) {
 	if bytes.Equal(expected.PasswordSalt(), actual.PasswordSalt()) {
 		t.Errorf("Unexpected equal password salts: %x", expected.PasswordSalt())
 	}
-}
-
-func prepareDb(t *testing.T) (*sql.DB, func()) {
-	_, db, cleanup := dal.SetupPostgresContainer(t)
-	dal.Migrate(db)
-
-	return db, cleanup
 }
