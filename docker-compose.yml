@@ -106,12 +106,25 @@ services:
       context: ./src
     container_name: kafka-relay
     environment:
-      - MODE=migrator
+      - MODE=kafka-relay
       - DB_DATABASE=${DB_DATABASE}
       - DB_USER=${DB_USER}
       - DB_PASS=${DB_PASS}
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
+    depends_on:
+      - kafka
+
+  traffic-collector:
+    build:
+      context: ./src
+    container_name: traffic-collector
+    environment:
+      - MODE=traffic-collector
+      - KAFKA_TOPIC=user-traffic
+      - KAFKA_AUTO_OFFSET_RESET=earliest
+      - KAFKA_GROUP_ID=traffic-processor
+      - KAFKA_BOOTSTRAP_SERVERS=localhost:9093
     depends_on:
       - kafka
 
