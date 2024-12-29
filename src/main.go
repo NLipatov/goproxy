@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"goproxy/application"
-	data_access "goproxy/dal"
+	"goproxy/dal"
 	"goproxy/dal/repositories"
 	"goproxy/infrastructure"
 	"goproxy/infrastructure/services"
@@ -27,7 +27,7 @@ func main() {
 }
 
 func applyMigrations() {
-	db, err := data_access.ConnectDB()
+	db, err := dal.ConnectDB()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func applyMigrations() {
 		_ = db.Close()
 	}(db)
 
-	data_access.Migrate(db)
+	dal.Migrate(db)
 	return
 }
 
@@ -45,7 +45,7 @@ func startHttpProxy() {
 		log.Fatalf("'HTTP_LISTENER_PORT' env var must be set")
 	}
 
-	db, err := data_access.ConnectDB()
+	db, err := dal.ConnectDB()
 	defer func(db *sql.DB) {
 		_ = db.Close()
 	}(db)
@@ -76,7 +76,7 @@ func startHttpRestApi() {
 		log.Fatalf("'HTTP_REST_API_PORT' env var must be set")
 	}
 
-	db, err := data_access.ConnectDB()
+	db, err := dal.ConnectDB()
 	defer func(db *sql.DB) {
 		_ = db.Close()
 	}(db)

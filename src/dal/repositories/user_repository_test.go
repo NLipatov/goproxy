@@ -104,8 +104,8 @@ func assertUsersNotEqual(t *testing.T, expected, actual aggregates.User) {
 }
 
 func prepareDb(t *testing.T) (*sql.DB, func()) {
-	_, db, cleanup := data_access.SetupPostgresContainer(t)
-	data_access.Migrate(db)
+	_, db, cleanup := dal.SetupPostgresContainer(t)
+	dal.Migrate(db)
 
 	return db, cleanup
 }

@@ -1,4 +1,4 @@
-package data_access
+package dal
 
 import (
 	"context"
