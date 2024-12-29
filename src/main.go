@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"goproxy/Application"
 	data_access "goproxy/DataAccess"
-	"goproxy/DataAccess/Repositories"
+	"goproxy/DataAccess/repositories"
 	"goproxy/Infrastructure"
 	"goproxy/Infrastructure/services"
 	"log"
@@ -58,7 +58,7 @@ func startHttpProxy() {
 		log.Fatal(err)
 	}
 
-	userRepository := Repositories.NewUserRepository(db, cache)
+	userRepository := repositories.NewUserRepository(db, cache)
 	cryptoService := services.NewCryptoService(32)
 	authService := services.NewAuthService(cryptoService)
 	authUseCases := Application.NewAuthUseCases(authService, userRepository)
@@ -89,7 +89,7 @@ func startHttpRestApi() {
 		log.Fatal(err)
 	}
 
-	userRepository := Repositories.NewUserRepository(db, cache)
+	userRepository := repositories.NewUserRepository(db, cache)
 	cryptoService := services.NewCryptoService(32)
 	useCases := Application.NewUserUseCases(userRepository, cryptoService)
 
@@ -100,6 +100,6 @@ func startHttpRestApi() {
 	}
 }
 
-func createBigcacheInstance() (Repositories.BigCacheUserRepositoryCache, error) {
-	return Repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
+func createBigcacheInstance() (repositories.BigCacheUserRepositoryCache, error) {
+	return repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
 }
