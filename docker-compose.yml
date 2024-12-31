@@ -133,9 +133,15 @@ services:
       - KAFKA_TOPIC=user-traffic
       - KAFKA_AUTO_OFFSET_RESET=earliest
       - KAFKA_GROUP_ID=traffic-processor
-      - KAFKA_BOOTSTRAP_SERVERS=localhost:9093
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9093
+      - REDIS_HOST=redis
+      - REDIS_PORT=${TC_REDIS_PORT}
+      - REDIS_USER=${TC_REDIS_USER}
+      - REDIS_PASSWORD=${TC_REDIS_PASSWORD}
     depends_on:
       - kafka
+      - redis
 
 volumes:
   postgres_data:
+  redis_data:
