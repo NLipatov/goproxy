@@ -115,6 +115,15 @@ services:
     depends_on:
       - kafka
 
+  redis:
+    image: redis:8.0-M02-bookworm
+    container_name: tc-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
   traffic-collector:
     build:
       context: ./src
