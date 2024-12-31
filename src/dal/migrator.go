@@ -53,7 +53,7 @@ func Migrate(db *sql.DB) {
 func getAppliedVersion(db *sql.DB) int {
 	var appliedVersion int
 	err := db.
-		QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations;\n").
+		QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations;").
 		Scan(&appliedVersion)
 	if err != nil {
 		if strings.Contains(err.Error(), "does not exist") {
