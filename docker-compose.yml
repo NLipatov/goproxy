@@ -137,7 +137,7 @@ services:
       - KAFKA_AUTO_OFFSET_RESET=earliest
       - KAFKA_GROUP_ID=traffic-processor
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - REDIS_HOST=traffic-collector-cache
+      - TC_CACHE_HOST=${TC_CACHE_HOST}
       - REDIS_PORT=${TC_REDIS_PORT}
       - REDIS_USER=${TC_REDIS_USER}
       - REDIS_PASSWORD=${TC_REDIS_PASSWORD}

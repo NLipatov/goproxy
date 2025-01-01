@@ -56,9 +56,9 @@ func instantiateMessageBusService() (application.MessageBusService, error) {
 }
 
 func instantiateCache() (*redis.Client, error) {
-	redisHost := os.Getenv("REDIS_HOST")
+	redisHost := os.Getenv("TC_CACHE_HOST")
 	if redisHost == "" {
-		return nil, errors.New("env variable REDIS_HOST is not set")
+		return nil, errors.New("env variable TC_CACHE_HOST is not set")
 	}
 
 	redisPort := os.Getenv("REDIS_PORT")
