@@ -120,13 +120,12 @@ services:
       - kafka
 
   redis:
-    image: redis:8.0-M02-bookworm
+    image: valkey/valkey:8.0-bookworm
     container_name: tc-redis
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes
     volumes:
-      - redis_data:/data
+      - valkey_data:/data
 
   traffic-collector:
     build:
@@ -148,4 +147,4 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
+  valkey_data:
