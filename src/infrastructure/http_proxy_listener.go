@@ -62,7 +62,7 @@ func (l *HttpListener) ServePort(port string) error {
 			continue
 		}
 
-		isCredentialsValid, authorizationErr := l.authUseCases.Authorize(credentials)
+		isCredentialsValid, userId, authorizationErr := l.authUseCases.Authorize(credentials)
 		if authorizationErr != nil {
 			log.Printf("Could not authorize: %v", authorizationErr)
 			continue
@@ -71,6 +71,8 @@ func (l *HttpListener) ServePort(port string) error {
 			log.Printf("Invalid credentials. Client: %s", clientConn.RemoteAddr())
 			continue
 		}
+
+		request.Header.Set("Proxy-Authorization", fmt.Sprintf("%d", userId))
 
 		go l.httpProxyService.Proxy(clientConn, request)
 	}

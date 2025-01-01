@@ -21,9 +21,26 @@ func main() {
 		startHttpProxy()
 	case "rest-api":
 		startHttpRestApi()
+	case "kafka-relay":
+		startKafkaRelay()
+	case "traffic-collector":
+		startTrafficCollector()
 	default:
 		log.Fatalf("Unsupported mode: %s", mode)
 	}
+}
+
+func startTrafficCollector() {
+	collector, err := infrastructure.NewTrafficCollector()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	collector.ProcessEvents()
+}
+
+func startKafkaRelay() {
+	infrastructure.StartOutboxProcessing()
 }
 
 func applyMigrations() {

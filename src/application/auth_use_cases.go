@@ -17,16 +17,21 @@ func NewAuthUseCases(authService AuthService, userRepository UserRepository) Aut
 	}
 }
 
-func (a *AuthUseCases) Authorize(credentials valueobjects.Credentials) (bool, error) {
+func (a *AuthUseCases) Authorize(credentials valueobjects.Credentials) (bool, int, error) {
 	bCredentials, ok := credentials.(*valueobjects.BasicCredentials)
 	if ok {
 		user, err := a.userRepository.GetByUsername(bCredentials.Username)
 		if err != nil {
-			return false, fmt.Errorf("user not found")
+			return false, 0, fmt.Errorf("user not found")
 		}
 
-		return a.authService.AuthorizeBasic(user, *bCredentials)
+		credentialsValid, err := a.authService.AuthorizeBasic(user, *bCredentials)
+		if err != nil {
+			return false, 0, err
+		}
+
+		return credentialsValid, user.Id(), nil
 	}
 
-	return false, fmt.Errorf("invalid credentials")
+	return false, 0, fmt.Errorf("invalid credentials")
 }

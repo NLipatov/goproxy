@@ -3,9 +3,9 @@ services:
     image: postgres:17.2-bookworm
     container_name: postgres
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: m1E416AwQv0sXsijwcx53o41pk2EXnvd
-      POSTGRES_DB: proxydb
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_DATABASE}
     ports:
       - "5432:5432"
     volumes:
@@ -14,53 +14,138 @@ services:
   migrator:
     build:
       context: ./src
-    image: goproxy:latest
     container_name: migrator
     environment:
       - MODE=migrator
-      - DB_DATABASE=proxydb
-      - DB_USER=admin
-      - DB_PASS=m1E416AwQv0sXsijwcx53o41pk2EXnvd
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
     depends_on:
       - postgres
 
   proxy:
     build:
       context: ./src
-    image: goproxy:latest
     container_name: proxy
     ports:
       - "8888:8888"
     environment:
       - MODE=proxy
-      - DB_DATABASE=proxydb
-      - DB_USER=admin
-      - DB_PASS=m1E416AwQv0sXsijwcx53o41pk2EXnvd
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
       - HTTP_LISTENER_PORT=8888
+      - TC_KAFKA_TOPIC=${TC_KAFKA_TOPIC}
+      - TC_KAFKA_AUTO_OFFSET_RESET=earliest
+      - TC_KAFKA_GROUP_ID=traffic-processor
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       - migrator
 
   rest-api:
     build:
       context: ./src
-    image: goproxy:latest
     container_name: rest-api
     ports:
       - "80:80"
     environment:
       - MODE=rest-api
-      - DB_DATABASE=proxydb
-      - DB_USER=admin
-      - DB_PASS=m1E416AwQv0sXsijwcx53o41pk2EXnvd
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
       - HTTP_REST_API_PORT=80
     depends_on:
       - migrator
 
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.8.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.8.0
+    depends_on:
+      - zookeeper
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  init-kafka-topics:
+    image: confluentinc/cp-kafka:7.8.0
+    depends_on:
+      - kafka
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      # blocks until kafka is reachable
+      kafka-topics --bootstrap-server kafka:9092 --list
+
+      echo -e 'Creating kafka topics'
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic user-traffic --replication-factor 1 --partitions 1
+
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server kafka:9092 --list
+      "
+
+  kafka-relay:
+    build:
+      context: ./src
+    container_name: kafka-relay
+    environment:
+      - MODE=kafka-relay
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+    depends_on:
+      - kafka
+
+  redis:
+    image: redis:8.0-M02-bookworm
+    container_name: tc-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  traffic-collector:
+    build:
+      context: ./src
+    container_name: traffic-collector
+    environment:
+      - MODE=traffic-collector
+      - KAFKA_TOPIC=${TC_KAFKA_TOPIC}
+      - KAFKA_AUTO_OFFSET_RESET=earliest
+      - KAFKA_GROUP_ID=traffic-processor
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_HOST=redis
+      - REDIS_PORT=${TC_REDIS_PORT}
+      - REDIS_USER=${TC_REDIS_USER}
+      - REDIS_PASSWORD=${TC_REDIS_PASSWORD}
+    depends_on:
+      - kafka
+      - redis
+
 volumes:
   postgres_data:
+  redis_data:
