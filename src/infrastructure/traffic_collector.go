@@ -56,38 +56,38 @@ func instantiateMessageBusService() (application.MessageBusService, error) {
 }
 
 func instantiateCache() (*redis.Client, error) {
-	redisHost := os.Getenv("TC_CACHE_HOST")
-	if redisHost == "" {
+	host := os.Getenv("TC_CACHE_HOST")
+	if host == "" {
 		return nil, errors.New("env variable TC_CACHE_HOST is not set")
 	}
 
-	redisPort := os.Getenv("REDIS_PORT")
-	if redisPort == "" {
-		return nil, errors.New("env variable REDIS_PORT is not set")
+	port := os.Getenv("TC_CACHE_PORT")
+	if port == "" {
+		return nil, errors.New("env variable TC_CACHE_PORT is not set")
 	}
 
-	redisUser := os.Getenv("REDIS_USER")
-	if redisUser == "" {
-		return nil, errors.New("env variable REDIS_USER is not set")
+	user := os.Getenv("TC_CACHE_USER")
+	if user == "" {
+		return nil, errors.New("env variable TC_CACHE_USER is not set")
 	}
 
-	redisPassword := os.Getenv("REDIS_PASSWORD")
+	password := os.Getenv("TC_CACHE_PASSWORD")
 
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", redisHost, redisPort),
-		Username: redisUser,
-		Password: redisPassword,
+	cacheClient := redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%s", host, port),
+		Username: user,
+		Password: password,
 		DB:       0,
 	})
 
 	ctx := context.Background()
-	_, err := redisClient.Ping(ctx).Result()
+	_, err := cacheClient.Ping(ctx).Result()
 	if err != nil {
 		log.Fatalf("Could not connect to Redis: %v", err)
 	}
 
 	log.Println("Connected to Redis successfully")
-	return redisClient, nil
+	return cacheClient, nil
 }
 
 func (t *TrafficCollector) ProcessEvents() {
