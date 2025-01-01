@@ -5,15 +5,15 @@ import "time"
 type UserConsumedTrafficEvent struct {
 	UserId    int
 	Timestamp time.Time
-	InMb      int
-	OutMb     int
+	InBytes   int
+	OutBytes  int
 }
 
-func NewUserConsumedTrafficEvent(userId, inMb, outMb int) UserConsumedTrafficEvent {
+func NewUserConsumedTrafficEvent(userId, in, out int) UserConsumedTrafficEvent {
 	return UserConsumedTrafficEvent{
 		UserId:    userId,
 		Timestamp: time.Now().UTC(),
-		InMb:      inMb,
-		OutMb:     outMb,
+		InBytes:   in,
+		OutBytes:  out,
 	}
 }

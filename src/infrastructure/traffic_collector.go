@@ -5,19 +5,57 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/go-redis/redis/v8"
+	"goproxy/application"
 	"goproxy/domain/events"
+	"goproxy/infrastructure/services"
 	"log"
 	"os"
 	"time"
 )
 
 type TrafficCollector struct {
-	redisClient *redis.Client
+	cache      *redis.Client
+	messageBus application.MessageBusService
 }
 
 func NewTrafficCollector() (*TrafficCollector, error) {
+	messageBus, err := instantiateMessageBusService()
+	if err != nil {
+		return nil, err
+	}
+
+	redisClient, err := instantiateCache()
+	if err != nil {
+		_ = messageBus.Close()
+		return nil, err
+	}
+
+	return &TrafficCollector{
+		cache:      redisClient,
+		messageBus: messageBus,
+	}, nil
+}
+
+func instantiateMessageBusService() (application.MessageBusService, error) {
+	bootstrapServers := os.Getenv("KAFKA_BOOTSTRAP_SERVERS")
+	groupId := os.Getenv("KAFKA_GROUP_ID")
+	autoOffsetReset := os.Getenv("KAFKA_AUTO_OFFSET_RESET")
+	topic := os.Getenv("KAFKA_TOPIC")
+
+	if groupId == "" || autoOffsetReset == "" || topic == "" || bootstrapServers == "" {
+		return nil, fmt.Errorf("invalid configuration")
+	}
+
+	messageBusService, err := services.NewKafkaService(bootstrapServers, groupId, autoOffsetReset)
+	if err != nil {
+		return nil, err
+	}
+
+	return messageBusService, nil
+}
+
+func instantiateCache() (*redis.Client, error) {
 	redisHost := os.Getenv("REDIS_HOST")
 	if redisHost == "" {
 		return nil, errors.New("env variable REDIS_HOST is not set")
@@ -49,99 +87,71 @@ func NewTrafficCollector() (*TrafficCollector, error) {
 	}
 
 	log.Println("Connected to Redis successfully")
-
-	return &TrafficCollector{
-		redisClient: redisClient,
-	}, nil
+	return redisClient, nil
 }
 
 func (t *TrafficCollector) ProcessEvents() {
-	config, readConfigErr := t.readConfigMapFromEnv()
-	if readConfigErr != nil {
-		log.Fatal(readConfigErr)
-	}
+	defer func(messageBus application.MessageBusService) {
+		_ = messageBus.Close()
+	}(t.messageBus)
 
-	consumer, err := kafka.NewConsumer(config)
-	if err != nil {
-		log.Fatalf("Failed to create consumer: %s", err)
-	}
-	defer func(consumer *kafka.Consumer) {
-		_ = consumer.Close()
-	}(consumer)
-
-	err = consumer.SubscribeTopics([]string{os.Getenv("KAFKA_TOPIC")}, nil)
+	err := t.messageBus.Subscribe([]string{os.Getenv("KAFKA_TOPIC")})
 	if err != nil {
 		log.Fatalf("Failed to subscribe to topic: %s", err)
 	}
 
 	for {
-		msg, readErr := consumer.ReadMessage(-1)
+		event, readErr := t.messageBus.Consume()
 		if readErr == nil {
-			t.consume(msg)
+			t.consume(event)
 		} else {
-			log.Printf("Consumer error: %v (%v)\n", readErr, msg)
+			log.Printf("Consumer error: %v (%v)\n", readErr, event)
 		}
 	}
 }
 
-func (t *TrafficCollector) readConfigMapFromEnv() (*kafka.ConfigMap, error) {
-	bootstrapServers := os.Getenv("KAFKA_BOOTSTRAP_SERVERS")
-	groupId := os.Getenv("KAFKA_GROUP_ID")
-	autoOffsetReset := os.Getenv("KAFKA_AUTO_OFFSET_RESET")
-	topic := os.Getenv("KAFKA_TOPIC")
-
-	if groupId == "" || autoOffsetReset == "" || topic == "" || bootstrapServers == "" {
-		return nil, fmt.Errorf("invalid configuration")
-	}
-
-	return &kafka.ConfigMap{
-		"bootstrap.servers": bootstrapServers,
-		"group.id":          groupId,
-		"auto.offset.reset": autoOffsetReset,
-	}, nil
-}
-
-func (t *TrafficCollector) consume(message *kafka.Message) {
+func (t *TrafficCollector) consume(outboxEvent *events.OutboxEvent) {
 	var event events.UserConsumedTrafficEvent
-	err := json.Unmarshal(message.Value, &event)
+	err := json.Unmarshal([]byte(outboxEvent.Payload), &event)
 	if err != nil {
 		log.Printf("Invalid event: %v", err)
+		return
 	}
 
 	ctx := context.Background()
 	key := fmt.Sprintf("user:%d:traffic:%s", event.UserId, time.Now().Format("02-01-2006"))
 
-	currentTraffic, err := t.redisClient.HGetAll(ctx, key).Result()
+	currentTraffic, err := t.cache.HGetAll(ctx, key).Result()
 	if err != nil {
 		log.Printf("failed to get current traffic: %v", err)
 		return
 	}
 
-	var inMb, outMb int
+	var inBytes, outBytes int
 	if len(currentTraffic) > 0 {
-		_, currentInScanErr := fmt.Sscanf(currentTraffic["inMb"], "%d", &inMb)
+		_, currentInScanErr := fmt.Sscanf(currentTraffic["inBytes"], "%d", &inBytes)
 		if currentInScanErr != nil {
-			inMb = 0
+			inBytes = 0
 		}
-		_, currentOutScanErr := fmt.Sscanf(currentTraffic["outMb"], "%d", &outMb)
+		_, currentOutScanErr := fmt.Sscanf(currentTraffic["outBytes"], "%d", &outBytes)
 		if currentOutScanErr != nil {
-			outMb = 0
+			outBytes = 0
 		}
 	}
 
-	inMb += event.InMb
-	outMb += event.OutMb
+	inBytes += event.InBytes
+	outBytes += event.OutBytes
 
-	err = t.redisClient.HSet(ctx, key, map[string]interface{}{
-		"inMb":  inMb,
-		"outMb": outMb,
+	err = t.cache.HSet(ctx, key, map[string]interface{}{
+		"inBytes":  inBytes,
+		"outBytes": outBytes,
 	}).Err()
 	if err != nil {
 		log.Printf("failed to update traffic: %v", err)
 		return
 	}
 
-	err = t.redisClient.Expire(ctx, key, 24*time.Hour).Err()
+	err = t.cache.Expire(ctx, key, 24*time.Hour).Err()
 	if err != nil {
 		log.Printf("failed to set TTL: %v", err)
 		return

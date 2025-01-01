@@ -39,6 +39,10 @@ services:
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
       - HTTP_LISTENER_PORT=8888
+      - TC_KAFKA_TOPIC=${TC_KAFKA_TOPIC}
+      - TC_KAFKA_AUTO_OFFSET_RESET=earliest
+      - TC_KAFKA_GROUP_ID=traffic-processor
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       - migrator
 
@@ -130,10 +134,10 @@ services:
     container_name: traffic-collector
     environment:
       - MODE=traffic-collector
-      - KAFKA_TOPIC=user-traffic
+      - KAFKA_TOPIC=${TC_KAFKA_TOPIC}
       - KAFKA_AUTO_OFFSET_RESET=earliest
       - KAFKA_GROUP_ID=traffic-processor
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9093
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - REDIS_HOST=redis
       - REDIS_PORT=${TC_REDIS_PORT}
       - REDIS_USER=${TC_REDIS_USER}
