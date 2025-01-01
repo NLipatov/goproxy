@@ -119,13 +119,13 @@ services:
     depends_on:
       - kafka
 
-  redis:
+  traffic-collector-cache:
     image: valkey/valkey:8.0-bookworm
-    container_name: tc-redis
+    container_name: traffic-collector-cache
     ports:
       - "6379:6379"
     volumes:
-      - valkey_data:/data
+      - traffic-collector-cache_data:/data
 
   traffic-collector:
     build:
@@ -137,14 +137,14 @@ services:
       - KAFKA_AUTO_OFFSET_RESET=earliest
       - KAFKA_GROUP_ID=traffic-processor
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - REDIS_HOST=redis
+      - REDIS_HOST=traffic-collector-cache
       - REDIS_PORT=${TC_REDIS_PORT}
       - REDIS_USER=${TC_REDIS_USER}
       - REDIS_PASSWORD=${TC_REDIS_PASSWORD}
     depends_on:
       - kafka
-      - redis
+      - traffic-collector-cache
 
 volumes:
   postgres_data:
-  valkey_data:
+  traffic-collector-cache_data:
