@@ -3,7 +3,6 @@ package dal
 import (
 	"database/sql"
 	_ "github.com/lib/pq"
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -40,14 +39,8 @@ func TestMigrate(t *testing.T) {
 		t.Fatalf("Failed to get schema migration version: %v", err)
 	}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get working directory: %v", err)
-	}
-
-	migrationsPath := filepath.Join(wd, "migrations", "v*.sql")
-
-	files, err := filepath.Glob(migrationsPath)
+	migrationsDir := getMigrationsPath()
+	files, err := filepath.Glob(migrationsDir)
 
 	if appliedVersion != len(files) {
 		t.Fatalf("Unexpected applied migration version. Expected %d, got %d", appliedVersion, len(files))
