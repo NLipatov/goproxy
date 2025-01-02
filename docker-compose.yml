@@ -138,9 +138,9 @@ services:
       - KAFKA_GROUP_ID=traffic-processor
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - TC_CACHE_HOST=${TC_CACHE_HOST}
-      - TC_CACHE_PORT=${TC_TC_CACHE_PORT}
-      - TC_CACHE_USER=${TC_TC_CACHE_USER}
-      - TC_CACHE_PASSWORD=${TC_TC_CACHE_PASSWORD}
+      - TC_CACHE_PORT=${TC_CACHE_PORT}
+      - TC_CACHE_USER=${TC_CACHE_USER}
+      - TC_CACHE_PASSWORD=${TC_CACHE_PASSWORD}
     depends_on:
       - kafka
       - traffic-collector-cache
