@@ -14,18 +14,7 @@ import (
 func Migrate(db *sql.DB) {
 	appliedVersion := getAppliedVersion(db)
 
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		log.Fatalf("Failed to get current file path")
-	}
-
-	databaseName := os.Getenv("DB_DATABASE")
-	if databaseName == "" {
-		log.Fatalf("DB_DATABASE env variable must be set.")
-	}
-
-	migrationsDir := filepath.Join(filepath.Dir(filename), "migrations", databaseName, "v*.sql")
-
+	migrationsDir := getMigrationsPath()
 	files, err := filepath.Glob(migrationsDir)
 	if err != nil {
 		log.Fatalf("Failed to read migration files: %s", err)
@@ -54,6 +43,19 @@ func Migrate(db *sql.DB) {
 	}
 
 	log.Printf("%d migrations applied", migrationCounter)
+}
+
+func getMigrationsPath() string {
+	databaseName := os.Getenv("DB_DATABASE")
+	if databaseName == "" {
+		log.Fatalf("DB_DATABASE env variable must be set.")
+	}
+
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		log.Fatalf("Failed to get current file path")
+	}
+	return filepath.Join(filepath.Dir(filename), "migrations", databaseName, "v*.sql")
 }
 
 func getAppliedVersion(db *sql.DB) int {
