@@ -18,7 +18,13 @@ func Migrate(db *sql.DB) {
 	if !ok {
 		log.Fatalf("Failed to get current file path")
 	}
-	migrationsDir := filepath.Join(filepath.Dir(filename), "migrations", "v*.sql")
+
+	databaseName := os.Getenv("DB_DATABASE")
+	if databaseName == "" {
+		log.Fatalf("DB_DATABASE env variable must be set.")
+	}
+
+	migrationsDir := filepath.Join(filepath.Dir(filename), "migrations", databaseName, "v*.sql")
 
 	files, err := filepath.Glob(migrationsDir)
 	if err != nil {
