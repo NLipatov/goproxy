@@ -123,6 +123,11 @@ func (l *HttpRestApiListener) DeleteUser(w http.ResponseWriter, r *http.Request)
 
 	userDeletionErr := l.userUseCases.Delete(command)
 	if userDeletionErr != nil {
+		if strings.Contains(userDeletionErr.Error(), "not found") {
+			respondWithError(w, http.StatusNotFound, "user not found")
+			return
+
+		}
 		respondWithError(w, http.StatusInternalServerError, "")
 		return
 	}
