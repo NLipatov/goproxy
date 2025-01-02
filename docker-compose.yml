@@ -23,10 +23,10 @@ services:
       timeout: 5s
       retries: 5
 
-  migrator:
+  auth-ctx-migrator:
     build:
       context: ./src
-    container_name: migrator
+    container_name: auth-ctx-migrator
     environment:
       - MODE=migrator
       - DB_DATABASE=${DB_DATABASE}
@@ -72,7 +72,7 @@ services:
       - TC_KAFKA_GROUP_ID=traffic-processor
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
-      - migrator
+      - auth-ctx-migrator
 
   rest-api:
     build:
@@ -89,7 +89,7 @@ services:
       - DB_PORT=${DB_PORT}
       - HTTP_REST_API_PORT=80
     depends_on:
-      - migrator
+      - auth-ctx-migrator
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.8.0
