@@ -37,6 +37,21 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+          
+  traffic-ctx-migrator:
+    build:
+      context: ./src
+    container_name: traffic-ctx-migrator
+    environment:
+      - MODE=migrator
+      - DB_DATABASE=${TRAFFIC_DB_DATABASE}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   proxy:
     build:
