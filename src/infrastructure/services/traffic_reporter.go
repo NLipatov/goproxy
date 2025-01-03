@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-// TrafficReporter хранит «аккумулятор» байт + параметры для промежуточных событий.
 type TrafficReporter struct {
 	userId         int
 	inBytes        int64
@@ -69,7 +68,6 @@ func (tr *TrafficReporter) AddOutBytes(n int64) {
 	tr.checkAndSend()
 }
 
-// checkAndSend смотрит, не пора ли отправить «промежуточное» событие.
 func (tr *TrafficReporter) checkAndSend() {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
@@ -82,7 +80,6 @@ func (tr *TrafficReporter) checkAndSend() {
 	}
 }
 
-// SendIntermediate отправляет накопленные байты и обнуляет счётчики.
 func (tr *TrafficReporter) SendIntermediate(in, out int64) {
 	if in == 0 && out == 0 {
 		tr.lastSent = time.Now()
@@ -95,7 +92,6 @@ func (tr *TrafficReporter) SendIntermediate(in, out int64) {
 	tr.lastSent = time.Now()
 }
 
-// SendFinal вызывается, когда поток закончился (соединение закрыто).
 func (tr *TrafficReporter) SendFinal() {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
@@ -106,7 +102,6 @@ func (tr *TrafficReporter) SendFinal() {
 		return
 	}
 	_ = tr.ProduceTrafficConsumedEvent(int(in), int(out))
-	// дальше обнулять не нужно — поток завершён
 }
 
 func (tr *TrafficReporter) ProduceTrafficConsumedEvent(in, out int) error {
