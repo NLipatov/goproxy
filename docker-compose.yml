@@ -23,6 +23,23 @@ services:
       timeout: 5s
       retries: 5
 
+  traffic-postgres:
+    image: postgres:17.2-bookworm
+    container_name: traffic-postgres
+    environment:
+      POSTGRES_USER: ${TRAFFIC_DB_USER}
+      POSTGRES_PASSWORD: ${TRAFFIC_DB_PASS}
+      POSTGRES_DB: ${TRAFFIC_DB_DATABASE}
+    ports:
+      - "5433:5432"
+    volumes:
+      - traffic-postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   auth-ctx-migrator:
     build:
       context: ./src
@@ -45,12 +62,12 @@ services:
     environment:
       - MODE=migrator
       - DB_DATABASE=${TRAFFIC_DB_DATABASE}
-      - DB_USER=${DB_USER}
-      - DB_PASS=${DB_PASS}
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
+      - DB_USER=${TRAFFIC_DB_USER}
+      - DB_PASS=${TRAFFIC_DB_PASS}
+      - DB_HOST=${TRAFFIC_DB_HOST}
+      - DB_PORT=${TRAFFIC_DB_PORT}
     depends_on:
-      postgres:
+      traffic-postgres:
         condition: service_healthy
 
   proxy:
@@ -181,4 +198,5 @@ services:
 
 volumes:
   postgres_data:
+  traffic-postgres_data:
   traffic-collector-cache_data:
