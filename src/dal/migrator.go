@@ -20,6 +20,10 @@ func Migrate(db *sql.DB) {
 		log.Fatalf("Failed to read migration files: %s", err)
 	}
 
+	if len(files) == 0 {
+		log.Fatalf("No migrations found in %s", migrationsDir)
+	}
+
 	sort.Strings(files)
 
 	migrationCounter := 0
