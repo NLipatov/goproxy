@@ -59,7 +59,7 @@ func (r *RedisCache[T]) Get(key string) (T, error) {
 
 	data, err := r.client.Get(ctx, key).Result()
 	if errors.Is(err, redis.Nil) {
-		return zero, nil
+		return zero, fmt.Errorf("not found")
 	}
 	if err != nil {
 		return zero, err
