@@ -34,7 +34,7 @@ func NewTrafficReporter(userId int, threshold int64, interval time.Duration) *Tr
 		userId:         userId,
 		thresholdBytes: threshold,
 		interval:       interval,
-		lastSent:       time.Now(),
+		lastSent:       time.Now().UTC(),
 		messageBus:     messageBusService,
 	}
 }
@@ -82,14 +82,14 @@ func (tr *TrafficReporter) checkAndSend() {
 
 func (tr *TrafficReporter) SendIntermediate(in, out int64) {
 	if in == 0 && out == 0 {
-		tr.lastSent = time.Now()
+		tr.lastSent = time.Now().UTC()
 		return
 	}
 	_ = tr.ProduceTrafficConsumedEvent(int(in), int(out))
 
 	atomic.StoreInt64(&tr.inBytes, 0)
 	atomic.StoreInt64(&tr.outBytes, 0)
-	tr.lastSent = time.Now()
+	tr.lastSent = time.Now().UTC()
 }
 
 func (tr *TrafficReporter) SendFinal() {

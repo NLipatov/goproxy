@@ -44,7 +44,7 @@ func TestTrafficReporter_AddInBytes(t *testing.T) {
 		thresholdBytes: 10,
 		interval:       time.Hour,
 		messageBus:     mockBus,
-		lastSent:       time.Now(),
+		lastSent:       time.Now().UTC(),
 	}
 
 	// Increase incoming bytes counter by less than threshold.
@@ -70,7 +70,7 @@ func TestTrafficReporter_AddOutBytes(t *testing.T) {
 		thresholdBytes: 10,
 		interval:       time.Hour,
 		messageBus:     mockBus,
-		lastSent:       time.Now(),
+		lastSent:       time.Now().UTC(),
 	}
 
 	// Increase incoming bytes counter by less than threshold.
@@ -94,7 +94,7 @@ func TestTrafficReporter_SendIntermediate(t *testing.T) {
 	reporter := &TrafficReporter{
 		userId:     1,
 		messageBus: mockBus,
-		lastSent:   time.Now().Add(-time.Minute),
+		lastSent:   time.Now().UTC().Add(-time.Minute),
 	}
 	reporter.AddInBytes(100)
 	reporter.AddOutBytes(200)

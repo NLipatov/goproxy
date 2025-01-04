@@ -86,7 +86,7 @@ func (t *TrafficCollector) consume(outboxEvent *events.OutboxEvent) {
 		return
 	}
 
-	key := fmt.Sprintf("user:%d:traffic:%s", event.UserId, time.Now().Format("02-01-2006"))
+	key := fmt.Sprintf("user:%d:traffic:%s", event.UserId, time.Now().UTC().Format("02-01-2006"))
 
 	currentTraffic, err := t.cache.Get(key)
 	if err != nil {
