@@ -4,10 +4,16 @@ import (
 	"database/sql"
 	_ "github.com/lib/pq"
 	"goproxy/domain/events"
+	"os"
 	"testing"
 )
 
 func TestDomainEventRepository(t *testing.T) {
+	setEnvErr := os.Setenv("DB_DATABASE", "proxydb")
+	if setEnvErr != nil {
+		t.Fatal(setEnvErr)
+	}
+
 	db, cleanup := prepareDb(t)
 	defer cleanup()
 	defer func(db *sql.DB) {

@@ -3,11 +3,17 @@ package dal
 import (
 	"database/sql"
 	_ "github.com/lib/pq"
+	"os"
 	"path/filepath"
 	"testing"
 )
 
 func TestMigrate(t *testing.T) {
+	setEnvErr := os.Setenv("DB_DATABASE", "proxydb")
+	if setEnvErr != nil {
+		t.Fatal(setEnvErr)
+	}
+
 	_, db, cleanup := SetupPostgresContainer(t)
 	defer cleanup()
 	defer func(db *sql.DB) {
