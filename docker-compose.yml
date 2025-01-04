@@ -37,6 +37,23 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+        
+  plans-postgres:
+    image: postgres:17.2-bookworm
+    container_name: plans-postgres
+    environment:
+      POSTGRES_USER: ${PLANS_DB_USER}
+      POSTGRES_PASSWORD: ${PLANS_DB_PASS}
+      POSTGRES_DB: ${PLANS_DB_DATABASE}
+    ports:
+      - "5434:5432"
+    volumes:
+      - plans-postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   auth-ctx-migrator:
     build:
@@ -67,7 +84,22 @@ services:
     depends_on:
       tc-postgres:
         condition: service_healthy
-
+  
+  plans-ctx-migrator:
+    build:
+      context: ./src
+    container_name: plans-ctx-migrator
+    environment:
+      - MODE=migrator
+      - DB_DATABASE=${PLANS_DB_DATABASE}
+      - DB_USER=${PLANS_DB_USER}
+      - DB_PASS=${PLANS_DB_PASS}
+      - DB_HOST=${PLANS_DB_HOST}
+      - DB_PORT=${PLANS_DB_PORT}
+    depends_on:
+      plans-postgres:
+        condition: service_healthy
+        
   proxy:
     build:
       context: ./src
@@ -196,5 +228,6 @@ services:
 
 volumes:
   postgres_data:
-  tc-postgres_data:
+  tc-postgres_data: 
+  plans-postgres_data:
   traffic-collector-cache_data:
