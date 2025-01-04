@@ -8,6 +8,7 @@ import (
 	"goproxy/infrastructure/services"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -43,8 +44,9 @@ func instantiateMessageBusService() (application.MessageBusService, error) {
 	groupId := os.Getenv("KAFKA_GROUP_ID")
 	autoOffsetReset := os.Getenv("KAFKA_AUTO_OFFSET_RESET")
 	topic := os.Getenv("KAFKA_TOPIC")
+	plansTopic := os.Getenv("PLANS_KAFKA_TOPIC")
 
-	if groupId == "" || autoOffsetReset == "" || topic == "" || bootstrapServers == "" {
+	if groupId == "" || autoOffsetReset == "" || topic == "" || bootstrapServers == "" || plansTopic == "" {
 		return nil, fmt.Errorf("invalid configuration")
 	}
 
@@ -88,8 +90,17 @@ func (t *TrafficCollector) consume(outboxEvent *events.OutboxEvent) {
 
 	currentTraffic, err := t.cache.Get(key)
 	if err != nil {
-		log.Printf("failed to get current traffic: %v", err)
-		return
+		if strings.Contains(err.Error(), "not found") {
+			t.producePlanVerificationEvent(event)
+			_ = t.cache.Set(key, userTraffic{
+				InBytes:  event.InBytes,
+				OutBytes: event.OutBytes,
+			})
+			return
+		} else {
+			log.Printf("failed to get current traffic: %v", err)
+			return
+		}
 	}
 
 	currentTraffic.InBytes += event.InBytes
@@ -105,5 +116,20 @@ func (t *TrafficCollector) consume(outboxEvent *events.OutboxEvent) {
 	if err != nil {
 		log.Printf("failed to set TTL: %v", err)
 		return
+	}
+}
+
+func (t *TrafficCollector) producePlanVerificationEvent(event events.UserConsumedTrafficEvent) {
+	planVerificationEvent := events.NewPlanVerificationRequired(event.UserId)
+	eventJson, serializationErr := json.Marshal(planVerificationEvent)
+	if serializationErr != nil {
+		log.Printf("Could not produce PlanVerificationRequired event due to serialization problem: %v", serializationErr)
+		return
+	}
+
+	outboxEvent := events.NewOutboxEvent(0, string(eventJson), false)
+	produceErr := t.messageBus.Produce(os.Getenv("PLANS_KAFKA_TOPIC"), outboxEvent)
+	if produceErr != nil {
+		log.Printf("Could not produce PlanVerificationRequired: %s", produceErr)
 	}
 }
