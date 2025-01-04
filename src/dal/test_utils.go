@@ -11,7 +11,7 @@ import (
 )
 
 func SetupPostgresContainer(t *testing.T) (testcontainers.Container, *sql.DB, func()) {
-	setEnv(t, "proxydb")
+	setEnv(t)
 	ctx := context.Background()
 
 	req := testcontainers.ContainerRequest{
@@ -74,13 +74,12 @@ func SetupPostgresContainer(t *testing.T) (testcontainers.Container, *sql.DB, fu
 	return postgresContainer, db, cleanup
 }
 
-func setEnv(t *testing.T, database string) {
+func setEnv(t *testing.T) {
 	envVars := map[string]string{
-		"DB_USER":     "test_user",
-		"DB_PASS":     "test_pass",
-		"DB_HOST":     "127.0.0.1",
-		"DB_PORT":     "6543",
-		"DB_DATABASE": database,
+		"DB_USER": "test_user",
+		"DB_PASS": "test_pass",
+		"DB_HOST": "127.0.0.1",
+		"DB_PORT": "6543",
 	}
 
 	for key, value := range envVars {

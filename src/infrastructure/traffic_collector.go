@@ -1,21 +1,24 @@
 package infrastructure
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/go-redis/redis/v8"
 	"goproxy/application"
 	"goproxy/domain/events"
 	"goproxy/infrastructure/services"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
+type userTraffic struct {
+	InBytes  int
+	OutBytes int
+}
+
 type TrafficCollector struct {
-	cache      *redis.Client
+	cache      application.CacheWithTTL[userTraffic]
 	messageBus application.MessageBusService
 }
 
@@ -25,14 +28,13 @@ func NewTrafficCollector() (*TrafficCollector, error) {
 		return nil, err
 	}
 
-	redisClient, err := instantiateCache()
-	if err != nil {
-		_ = messageBus.Close()
-		return nil, err
+	redisCache, redisCacheClientErr := services.NewRedisCache[userTraffic]()
+	if redisCacheClientErr != nil {
+		log.Fatal(redisCacheClientErr)
 	}
 
 	return &TrafficCollector{
-		cache:      redisClient,
+		cache:      redisCache,
 		messageBus: messageBus,
 	}, nil
 }
@@ -42,8 +44,9 @@ func instantiateMessageBusService() (application.MessageBusService, error) {
 	groupId := os.Getenv("KAFKA_GROUP_ID")
 	autoOffsetReset := os.Getenv("KAFKA_AUTO_OFFSET_RESET")
 	topic := os.Getenv("KAFKA_TOPIC")
+	plansTopic := os.Getenv("PLANS_KAFKA_TOPIC")
 
-	if groupId == "" || autoOffsetReset == "" || topic == "" || bootstrapServers == "" {
+	if groupId == "" || autoOffsetReset == "" || topic == "" || bootstrapServers == "" || plansTopic == "" {
 		return nil, fmt.Errorf("invalid configuration")
 	}
 
@@ -53,41 +56,6 @@ func instantiateMessageBusService() (application.MessageBusService, error) {
 	}
 
 	return messageBusService, nil
-}
-
-func instantiateCache() (*redis.Client, error) {
-	host := os.Getenv("TC_CACHE_HOST")
-	if host == "" {
-		return nil, errors.New("env variable TC_CACHE_HOST is not set")
-	}
-
-	port := os.Getenv("TC_CACHE_PORT")
-	if port == "" {
-		return nil, errors.New("env variable TC_CACHE_PORT is not set")
-	}
-
-	user := os.Getenv("TC_CACHE_USER")
-	if user == "" {
-		return nil, errors.New("env variable TC_CACHE_USER is not set")
-	}
-
-	password := os.Getenv("TC_CACHE_PASSWORD")
-
-	cacheClient := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", host, port),
-		Username: user,
-		Password: password,
-		DB:       0,
-	})
-
-	ctx := context.Background()
-	_, err := cacheClient.Ping(ctx).Result()
-	if err != nil {
-		log.Fatalf("Could not connect to Redis: %v", err)
-	}
-
-	log.Println("Connected to Redis successfully")
-	return cacheClient, nil
 }
 
 func (t *TrafficCollector) ProcessEvents() {
@@ -118,42 +86,50 @@ func (t *TrafficCollector) consume(outboxEvent *events.OutboxEvent) {
 		return
 	}
 
-	ctx := context.Background()
-	key := fmt.Sprintf("user:%d:traffic:%s", event.UserId, time.Now().Format("02-01-2006"))
+	key := fmt.Sprintf("user:%d:traffic:%s", event.UserId, time.Now().UTC().Format("02-01-2006"))
 
-	currentTraffic, err := t.cache.HGetAll(ctx, key).Result()
+	currentTraffic, err := t.cache.Get(key)
 	if err != nil {
-		log.Printf("failed to get current traffic: %v", err)
-		return
-	}
-
-	var inBytes, outBytes int
-	if len(currentTraffic) > 0 {
-		_, currentInScanErr := fmt.Sscanf(currentTraffic["inBytes"], "%d", &inBytes)
-		if currentInScanErr != nil {
-			inBytes = 0
-		}
-		_, currentOutScanErr := fmt.Sscanf(currentTraffic["outBytes"], "%d", &outBytes)
-		if currentOutScanErr != nil {
-			outBytes = 0
+		if strings.Contains(err.Error(), "not found") {
+			t.producePlanVerificationEvent(event)
+			_ = t.cache.Set(key, userTraffic{
+				InBytes:  event.InBytes,
+				OutBytes: event.OutBytes,
+			})
+			return
+		} else {
+			log.Printf("failed to get current traffic: %v", err)
+			return
 		}
 	}
 
-	inBytes += event.InBytes
-	outBytes += event.OutBytes
+	currentTraffic.InBytes += event.InBytes
+	currentTraffic.OutBytes += event.OutBytes
 
-	err = t.cache.HSet(ctx, key, map[string]interface{}{
-		"inBytes":  inBytes,
-		"outBytes": outBytes,
-	}).Err()
+	err = t.cache.Set(key, currentTraffic)
 	if err != nil {
 		log.Printf("failed to update traffic: %v", err)
 		return
 	}
 
-	err = t.cache.Expire(ctx, key, 24*time.Hour).Err()
+	err = t.cache.Expire(key, 24*time.Hour)
 	if err != nil {
 		log.Printf("failed to set TTL: %v", err)
 		return
+	}
+}
+
+func (t *TrafficCollector) producePlanVerificationEvent(event events.UserConsumedTrafficEvent) {
+	planVerificationEvent := events.NewPlanVerificationRequired(event.UserId)
+	eventJson, serializationErr := json.Marshal(planVerificationEvent)
+	if serializationErr != nil {
+		log.Printf("Could not produce PlanVerificationRequired event due to serialization problem: %v", serializationErr)
+		return
+	}
+
+	outboxEvent := events.NewOutboxEvent(0, string(eventJson), false)
+	produceErr := t.messageBus.Produce(os.Getenv("PLANS_KAFKA_TOPIC"), outboxEvent)
+	if produceErr != nil {
+		log.Printf("Could not produce PlanVerificationRequired: %s", produceErr)
 	}
 }

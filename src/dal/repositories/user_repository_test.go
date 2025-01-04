@@ -6,11 +6,17 @@ import (
 	"fmt"
 	_ "github.com/lib/pq"
 	"goproxy/domain/aggregates"
+	"os"
 	"testing"
 	"time"
 )
 
 func TestUserRepository(t *testing.T) {
+	setEnvErr := os.Setenv("DB_DATABASE", "proxydb")
+	if setEnvErr != nil {
+		t.Fatal(setEnvErr)
+	}
+
 	db, cleanup := prepareDb(t)
 	defer cleanup()
 	defer func(db *sql.DB) {
@@ -64,7 +70,7 @@ func TestUserRepository(t *testing.T) {
 }
 
 func insertTestUser(repo *UserRepository, t *testing.T) int {
-	username := fmt.Sprintf("test_user_%d", time.Now().UnixNano())
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
 	user, err := aggregates.NewUser(-1, username, []byte("hashed_password"), []byte("salt"))
 	assertNoError(t, err, "Failed to create test user aggregate")
 	id, err := repo.Create(user)
