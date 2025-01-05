@@ -83,13 +83,9 @@ func (d DomainEventRepository) Delete(event events.OutboxEvent) error {
 		return fmt.Errorf("could not delete event: %v", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("could not fetch rows affected: %v", err)
+	affected, err := result.RowsAffected()
+	if err != nil || affected == 0 {
+		return fmt.Errorf("no rows affected")
 	}
-	if rowsAffected == 0 {
-		return fmt.Errorf("no event found with id %d", event.Id)
-	}
-
 	return nil
 }

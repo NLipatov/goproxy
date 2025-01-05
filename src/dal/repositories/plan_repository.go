@@ -74,9 +74,14 @@ func (p *PlanRepository) Update(plan aggregates.Plan) error {
 }
 
 func (p *PlanRepository) Delete(plan aggregates.Plan) error {
-	_, err := p.db.Exec(deletePlanQuery, plan.Id())
+	result, err := p.db.Exec(deletePlanQuery, plan.Id())
 	if err != nil {
 		return fmt.Errorf("could not delete plan: %v", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil || affected == 0 {
+		return fmt.Errorf("no rows affected")
 	}
 	return nil
 }
