@@ -63,10 +63,14 @@ func (t *TrafficCollector) ProcessEvents() {
 		_ = messageBus.Close()
 	}(t.messageBus)
 
-	err := t.messageBus.Subscribe([]string{os.Getenv("KAFKA_TOPIC")})
+	userTrafficTopic := os.Getenv("KAFKA_TOPIC")
+	topics := []string{userTrafficTopic}
+	err := t.messageBus.Subscribe(topics)
 	if err != nil {
-		log.Fatalf("Failed to subscribe to topic: %s", err)
+		log.Fatalf("Failed to subscribe to topics: %s", err)
 	}
+
+	log.Printf("Subscribed to topics: %s", strings.Join(topics, ", "))
 
 	for {
 		event, readErr := t.messageBus.Consume()
