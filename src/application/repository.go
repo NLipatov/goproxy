@@ -23,3 +23,13 @@ type EventRepository interface {
 	Update(event events.OutboxEvent) error
 	Delete(event events.OutboxEvent) error
 }
+
+type PlanRepository interface {
+	Repository[aggregates.Plan]
+	GetByName(name string) (aggregates.Plan, error)
+}
+
+type UserPlanRepository interface {
+	Repository[aggregates.UserPlan]
+	GetUserActivePlan(userId int) (aggregates.UserPlan, error)
+}

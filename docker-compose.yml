@@ -20,23 +20,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  tc-postgres:
-    image: postgres:17.2-bookworm
-    container_name: tc-postgres
-    environment:
-      POSTGRES_USER: ${TC_DB_USER}
-      POSTGRES_PASSWORD: ${TC_DB_PASS}
-      POSTGRES_DB: ${TC_DB_DATABASE}
-    ports:
-      - "5433:5432"
-    volumes:
-      - tc-postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
         
   plans-postgres:
     image: postgres:17.2-bookworm
@@ -69,22 +52,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-          
-  traffic-ctx-migrator:
-    build:
-      context: ./src
-    container_name: traffic-ctx-migrator
-    environment:
-      - MODE=migrator
-      - DB_DATABASE=${TC_DB_DATABASE}
-      - DB_USER=${TC_DB_USER}
-      - DB_PASS=${TC_DB_PASS}
-      - DB_HOST=${TC_DB_HOST}
-      - DB_PORT=${TC_DB_PORT}
-    depends_on:
-      tc-postgres:
-        condition: service_healthy
-  
+
   plans-ctx-migrator:
     build:
       context: ./src
@@ -185,6 +153,8 @@ services:
 
       echo -e 'Successfully created the following topics:'
       kafka-topics --bootstrap-server kafka:9092 --list
+      
+      exit 0
       "
 
   kafka-relay:
@@ -208,6 +178,12 @@ services:
       - "6379:6379"
     volumes:
       - traffic-collector-cache_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   traffic-collector:
     build:
@@ -215,7 +191,6 @@ services:
     container_name: traffic-collector
     environment:
       - MODE=traffic-collector
-      - PLANS_TOPIC=${PLANS_KAFKA_TOPIC}
       - KAFKA_TOPIC=${TC_KAFKA_TOPIC}
       - KAFKA_AUTO_OFFSET_RESET=earliest
       - KAFKA_GROUP_ID=traffic-processor
@@ -225,11 +200,16 @@ services:
       - TC_CACHE_USER=${TC_CACHE_USER}
       - TC_CACHE_PASSWORD=${TC_CACHE_PASSWORD}
     depends_on:
-      - kafka
-      - traffic-collector-cache
+      init-kafka-topics:
+        condition: service_completed_successfully
+      plans-postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      traffic-collector-cache:
+        condition: service_healthy
 
 volumes:
   postgres_data:
-  tc-postgres_data: 
   plans-postgres_data:
   traffic-collector-cache_data:

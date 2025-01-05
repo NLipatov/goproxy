@@ -4,12 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	"goproxy/domain/aggregates"
-	"log"
 	"time"
 )
 
 const selectUserPlanById = "SELECT id, user_id, plan_id, valid_to, created_at FROM plans.public.user_plans WHERE id=$1"
-const selectActiveUserPlans = "SELECT id, user_id, plan_id, valid_to, created_at FROM plans.public.user_plans WHERE valid_to > now()"
+const selectActiveUserPlans = "SELECT id, user_id, plan_id, valid_to, created_at FROM plans.public.user_plans WHERE user_id = $1 AND valid_to > now()"
 const selectUserPlans = "SELECT id, user_id, plan_id, valid_to, created_at FROM plans.public.user_plans"
 const insertUserPlan = "INSERT INTO plans.public.user_plans (user_id, plan_id, valid_to) VALUES ($1, $2, $3) RETURNING id"
 const updateUserPlan = "UPDATE plans.public.user_plans SET user_id=$1, plan_id=$2, valid_to=$3 WHERE id = $4 RETURNING id"
@@ -25,46 +24,27 @@ func NewUserPlanRepository(db *sql.DB) *UserPlanRepository {
 	}
 }
 
-func (up *UserPlanRepository) GetUserActivePlans(userId int) ([]aggregates.UserPlan, error) {
-	rows, err := up.db.Query(selectActiveUserPlans, userId)
+func (up *UserPlanRepository) GetUserActivePlan(userId int) (aggregates.UserPlan, error) {
+	var id int
+	var uId int
+	var pId int
+	var validTo time.Time
+	var createdAt time.Time
+
+	err := up.db.
+		QueryRow(selectActiveUserPlans, userId).
+		Scan(&id, &uId, &pId, &validTo, &createdAt)
+
 	if err != nil {
-		return nil, err
+		return aggregates.UserPlan{}, err
 	}
 
-	var userPlans []aggregates.UserPlan
-	defer func(rows *sql.Rows) {
-		closeErr := rows.Close()
-		if closeErr != nil {
-			log.Printf("failed to close rows: %v", closeErr)
-		}
-	}(rows)
-
-	for rows.Next() {
-		var id int
-		var uId int
-		var pId int
-		var validTo time.Time
-		var createdAt time.Time
-
-		scanErr := rows.Scan(&id, &uId, &pId, &validTo, &createdAt)
-		if scanErr != nil {
-			return nil, scanErr
-		}
-
-		userPlan, validationErr := aggregates.NewUserPlan(id, uId, pId, validTo, createdAt)
-		if validationErr != nil {
-			return nil, validationErr
-		}
-
-		userPlans = append(userPlans, userPlan)
+	userPlan, validationErr := aggregates.NewUserPlan(id, uId, pId, validTo, createdAt)
+	if validationErr != nil {
+		return aggregates.UserPlan{}, fmt.Errorf("invalid user plan id: %d, error: %s", id, validationErr)
 	}
 
-	iterationErr := rows.Err()
-	if iterationErr != nil {
-		return nil, iterationErr
-	}
-
-	return userPlans, nil
+	return userPlan, nil
 }
 
 func (up *UserPlanRepository) GetById(id int) (aggregates.UserPlan, error) {

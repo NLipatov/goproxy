@@ -85,7 +85,7 @@ func (tr *TrafficReporter) SendIntermediate(in, out int64) {
 		tr.lastSent = time.Now().UTC()
 		return
 	}
-	_ = tr.ProduceTrafficConsumedEvent(int(in), int(out))
+	_ = tr.ProduceTrafficConsumedEvent(in, out)
 
 	atomic.StoreInt64(&tr.inBytes, 0)
 	atomic.StoreInt64(&tr.outBytes, 0)
@@ -101,10 +101,10 @@ func (tr *TrafficReporter) SendFinal() {
 	if in == 0 && out == 0 {
 		return
 	}
-	_ = tr.ProduceTrafficConsumedEvent(int(in), int(out))
+	_ = tr.ProduceTrafficConsumedEvent(in, out)
 }
 
-func (tr *TrafficReporter) ProduceTrafficConsumedEvent(in, out int) error {
+func (tr *TrafficReporter) ProduceTrafficConsumedEvent(in, out int64) error {
 	event := events.NewUserConsumedTrafficEvent(tr.userId, in, out)
 	eventJson, serializationErr := json.Marshal(event)
 	if serializationErr != nil {
