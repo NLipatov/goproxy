@@ -148,6 +148,19 @@ func (p *PlanController) loadFromDB(userId int) (dto.UserTraffic, error) {
 	activePlan, activePlanFetchErr := p.planRepository.GetById(userPlanRow.PlanId())
 	if activePlanFetchErr != nil {
 		//Produce user without plan event
+		userConsumedTrafficWithoutPlan := events.NewUserConsumedTrafficWithoutPlan(userId)
+		data, serializationErr := json.Marshal(userConsumedTrafficWithoutPlan)
+		if serializationErr != nil {
+			log.Fatalf("failed to serialize user consumed a traffic without a plan event: %s", serializationErr)
+			return dto.UserTraffic{}, serializationErr
+		}
+		outboxEvent := events.NewOutboxEvent(0, string(data), false)
+
+		produceErr := p.messageBus.Produce("user-plans", outboxEvent)
+		if produceErr != nil {
+			log.Fatalf("failed to produce user consumed a traffic without a plan event: %s", produceErr)
+		}
+
 		log.Printf("failed to fetch active plan: %s", activePlanFetchErr)
 		return dto.UserTraffic{}, fmt.Errorf("user does not have a plan")
 	}
