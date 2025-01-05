@@ -5,11 +5,11 @@ import "time"
 type UserConsumedTrafficEvent struct {
 	UserId    int
 	Timestamp time.Time
-	InBytes   int
-	OutBytes  int
+	InBytes   int64
+	OutBytes  int64
 }
 
-func NewUserConsumedTrafficEvent(userId, in, out int) UserConsumedTrafficEvent {
+func NewUserConsumedTrafficEvent(userId int, in, out int64) UserConsumedTrafficEvent {
 	return UserConsumedTrafficEvent{
 		UserId:    userId,
 		Timestamp: time.Now().UTC(),

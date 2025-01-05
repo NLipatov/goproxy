@@ -82,19 +82,30 @@ func (u *UserRepository) Create(user aggregates.User) (int, error) {
 }
 
 func (u *UserRepository) Update(user aggregates.User) error {
-	_, err := u.db.
+	result, err := u.db.
 		Exec("UPDATE public.users SET username = $1, password_hash = $2, password_salt = $3 WHERE id = $4",
 			user.Username(), user.PasswordHash(), user.PasswordSalt(), user.Id())
 	if err != nil {
 		return fmt.Errorf("could not update user: %v", err)
 	}
+
+	affected, err := result.RowsAffected()
+	if err != nil || affected == 0 {
+		return fmt.Errorf("no rows updated for user plan id: %d", user.Id())
+	}
+
 	return nil
 }
 
 func (u *UserRepository) Delete(user aggregates.User) error {
-	_, err := u.db.Exec("DELETE FROM public.users WHERE id = $1", user.Id())
+	result, err := u.db.Exec("DELETE FROM public.users WHERE id = $1", user.Id())
 	if err != nil {
 		return fmt.Errorf("could not delete user: %v", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil || affected == 0 {
+		return fmt.Errorf("no rows affected")
 	}
 	return nil
 }
