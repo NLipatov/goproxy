@@ -123,10 +123,13 @@ func startHttpProxy() {
 		log.Fatal(err)
 	}
 
+	userRestrictionService := services.NewUserRestrictionService()
 	userRepository := repositories.NewUserRepository(db, cache)
 	cryptoService := services.NewCryptoService(32)
 	authService := services.NewAuthService(cryptoService)
-	authUseCases := application.NewAuthUseCases(authService, userRepository)
+	authUseCases := application.NewAuthUseCases(authService, userRepository, userRestrictionService)
+
+	go userRestrictionService.ProcessEvents()
 
 	listener := infrastructure.NewHttpListener(authUseCases)
 	err = listener.ServePort(port)

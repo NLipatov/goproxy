@@ -87,7 +87,7 @@ func (p *PlanController) ProcessEvents() {
 			log.Printf("failed to consume from message bus: %s", consumeErr)
 		}
 
-		if event.EventType.Value() == "NewUserConsumedTrafficEvent" {
+		if event.EventType.Value() == "UserConsumedTrafficEvent" {
 			p.consumeUserConsumedTraffic(event)
 		}
 	}
@@ -128,7 +128,10 @@ func (p *PlanController) consumeUserConsumedTraffic(outboxEvent *events.OutboxEv
 	}
 
 	if currentTraffic.OutBytes+currentTraffic.InBytes > currentTraffic.PlanLimitBytes {
-
+		produceErr := p.produceUserExceededTrafficLimitEvent(event.UserId)
+		if produceErr != nil {
+			log.Printf("could not produce user exceeded traffic limit event: %s", produceErr)
+		}
 	}
 }
 

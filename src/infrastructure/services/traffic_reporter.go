@@ -119,7 +119,7 @@ func (tr *TrafficReporter) ProduceTrafficConsumedEvent(in, out int64) error {
 		return serializationErr
 	}
 
-	outboxEvent, outboxEventValidationErr := events.NewOutboxEvent(0, string(eventJson), false, "NewUserConsumedTrafficEvent")
+	outboxEvent, outboxEventValidationErr := events.NewOutboxEvent(0, string(eventJson), false, "UserConsumedTrafficEvent")
 	if outboxEventValidationErr != nil {
 		return outboxEventValidationErr
 	}

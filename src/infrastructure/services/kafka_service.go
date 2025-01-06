@@ -6,6 +6,7 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"goproxy/application"
 	"goproxy/domain/events"
+	"log"
 )
 
 type KafkaService struct {
@@ -84,6 +85,13 @@ func (k KafkaService) Produce(topic string, event events.OutboxEvent) error {
 	}
 
 	e := <-deliveryChan
+	if m, ok := e.(*kafka.Message); ok {
+		if m.TopicPartition.Error != nil {
+			return fmt.Errorf("delivery failed: %v", m.TopicPartition.Error)
+		}
+	} else {
+		log.Printf("unexpected kafka event type: %T", e)
+	}
 	m := e.(*kafka.Message)
 	if m.TopicPartition.Error != nil {
 		return fmt.Errorf("failed to deliver message: %v", m.TopicPartition.Error)
