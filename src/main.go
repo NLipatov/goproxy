@@ -25,7 +25,7 @@ func main() {
 		startHttpRestApi()
 	case "kafka-relay":
 		startKafkaRelay()
-	case "traffic-collector":
+	case "plan-controller":
 		startTrafficCollector()
 	default:
 		log.Fatalf("Unsupported mode: %s", mode)

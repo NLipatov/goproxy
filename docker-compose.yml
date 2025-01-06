@@ -21,9 +21,9 @@ services:
       timeout: 5s
       retries: 5
         
-  plans-postgres:
+  plan-postgres:
     image: postgres:17.2-bookworm
-    container_name: plans-postgres
+    container_name: plan-postgres
     environment:
       POSTGRES_USER: ${PLANS_DB_USER}
       POSTGRES_PASSWORD: ${PLANS_DB_PASS}
@@ -31,7 +31,7 @@ services:
     ports:
       - "5434:5432"
     volumes:
-      - plans-postgres_data:/var/lib/postgresql/data
+      - plan-postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
       interval: 10s
@@ -65,7 +65,7 @@ services:
       - DB_HOST=${PLANS_DB_HOST}
       - DB_PORT=${PLANS_DB_PORT}
     depends_on:
-      plans-postgres:
+      plan-postgres:
         condition: service_healthy
         
   proxy:
@@ -82,7 +82,7 @@ services:
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
       - HTTP_LISTENER_PORT=8888
-      - TC_KAFKA_TOPIC=${TC_KAFKA_TOPIC}
+      - PROXY_KAFKA_TOPIC=${PROXY_KAFKA_TOPIC}
       - TC_KAFKA_AUTO_OFFSET_RESET=earliest
       - TC_KAFKA_GROUP_ID=traffic-processor
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
@@ -171,13 +171,13 @@ services:
     depends_on:
       - kafka
 
-  traffic-collector-cache:
+  plan-controller-cache:
     image: valkey/valkey:8.0-bookworm
-    container_name: traffic-collector-cache
+    container_name: plan-controller-cache
     ports:
       - "6379:6379"
     volumes:
-      - traffic-collector-cache_data:/data
+      - plan-controller-cache_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
@@ -185,13 +185,18 @@ services:
       retries: 3
       start_period: 5s
 
-  traffic-collector:
+  plan-controller:
     build:
       context: ./src
-    container_name: traffic-collector
+    container_name: plan-controller
     environment:
-      - MODE=traffic-collector
-      - KAFKA_TOPIC=${TC_KAFKA_TOPIC}
+      - MODE=plan-controller
+      - DB_USER=${PLANS_DB_USER}
+      - DB_PASS=${PLANS_DB_PASS}
+      - DB_HOST=${PLANS_DB_HOST}
+      - DB_PORT=${PLANS_DB_PORT}
+      - DB_DATABASE=${PLANS_DB_DATABASE}
+      - KAFKA_TOPIC=${PROXY_KAFKA_TOPIC}
       - KAFKA_AUTO_OFFSET_RESET=earliest
       - KAFKA_GROUP_ID=traffic-processor
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
@@ -199,17 +204,18 @@ services:
       - TC_CACHE_PORT=${TC_CACHE_PORT}
       - TC_CACHE_USER=${TC_CACHE_USER}
       - TC_CACHE_PASSWORD=${TC_CACHE_PASSWORD}
+      - PLANS_KAFKA_TOPIC=${PLANS_KAFKA_TOPIC}
     depends_on:
       init-kafka-topics:
         condition: service_completed_successfully
-      plans-postgres:
+      plan-postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      traffic-collector-cache:
+      plan-controller-cache:
         condition: service_healthy
 
 volumes:
   postgres_data:
-  plans-postgres_data:
-  traffic-collector-cache_data:
+  plan-postgres_data:
+  plan-controller-cache_data:

@@ -25,29 +25,29 @@ func TestDomainEventRepository(t *testing.T) {
 
 	t.Run("GetById", func(t *testing.T) {
 		eventId := insertTestEvent(repo, t)
-		event, err := repo.GetById(eventId)
-		assertNoError(t, err, "Failed to load event by Id")
+		event, eventValidationErr := repo.GetById(eventId)
+		assertNoError(t, eventValidationErr, "Failed to load event by Id")
 		assertEventExists(t, event, eventId)
 	})
 
 	t.Run("Insert", func(t *testing.T) {
 		eventId := insertTestEvent(repo, t)
-		event, err := repo.GetById(eventId)
-		assertNoError(t, err, "Failed to load inserted event")
+		event, eventValidationErr := repo.GetById(eventId)
+		assertNoError(t, eventValidationErr, "Failed to load inserted event")
 		assertEventExists(t, event, eventId)
 	})
 
 	t.Run("Update", func(t *testing.T) {
 		eventId := insertTestEvent(repo, t)
-		event, err := repo.GetById(eventId)
-		assertNoError(t, err, "Failed to load event by Id")
+		event, eventValidationErr := repo.GetById(eventId)
+		assertNoError(t, eventValidationErr, "Failed to load event by Id")
 
 		updatedPayload := `{"type":"UPDATED_TEST_EVENT","data":{"key":"updated-value"}}`
 		event.Payload = updatedPayload
 
 		assertNoError(t, repo.Update(event), "Failed to update event")
-		updatedEvent, err := repo.GetById(eventId)
-		assertNoError(t, err, "Failed to load updated event")
+		updatedEvent, eventValidationErr := repo.GetById(eventId)
+		assertNoError(t, eventValidationErr, "Failed to load updated event")
 
 		assertJSONEqual(t, updatedPayload, updatedEvent.Payload)
 	})
@@ -67,10 +67,11 @@ func TestDomainEventRepository(t *testing.T) {
 
 func insertTestEvent(repo *DomainEventRepository, t *testing.T) int {
 	payload := `{"type":"TEST_EVENT","data":{"key":"value"}}`
-	event := events.OutboxEvent{
-		Payload:   payload,
-		Published: false,
+	event, eventValidationErr := events.NewOutboxEvent(-1, payload, false, "test_event")
+	if eventValidationErr != nil {
+		t.Fatalf("test event is not valid: %s", eventValidationErr)
 	}
+
 	id, err := repo.Create(event)
 	assertNoError(t, err, "Failed to insert test event")
 	return id

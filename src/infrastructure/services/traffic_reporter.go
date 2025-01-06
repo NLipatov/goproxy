@@ -2,7 +2,6 @@ package services
 
 import (
 	"encoding/json"
-	"fmt"
 	"goproxy/application"
 	"goproxy/domain/events"
 	"log"
@@ -24,10 +23,10 @@ type TrafficReporter struct {
 	messageBus application.MessageBusService
 }
 
-func NewTrafficReporter(userId int, threshold int64, interval time.Duration) *TrafficReporter {
+func NewTrafficReporter(userId int, threshold int64, interval time.Duration) (*TrafficReporter, error) {
 	messageBusService, err := instantiateMessageBusService()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	return &TrafficReporter{
@@ -36,17 +35,25 @@ func NewTrafficReporter(userId int, threshold int64, interval time.Duration) *Tr
 		interval:       interval,
 		lastSent:       time.Now().UTC(),
 		messageBus:     messageBusService,
-	}
+	}, nil
 }
 
 func instantiateMessageBusService() (application.MessageBusService, error) {
 	bootstrapServers := os.Getenv("KAFKA_BOOTSTRAP_SERVERS")
+	if bootstrapServers == "" {
+		log.Printf("env variable KAFKA_BOOTSTRAP_SERVERS must be set")
+	}
 	groupId := os.Getenv("TC_KAFKA_GROUP_ID")
+	if groupId == "" {
+		log.Printf("env variable TC_KAFKA_GROUP_ID must be set")
+	}
 	autoOffsetReset := os.Getenv("TC_KAFKA_AUTO_OFFSET_RESET")
-	topic := os.Getenv("TC_KAFKA_TOPIC")
-
-	if groupId == "" || autoOffsetReset == "" || topic == "" || bootstrapServers == "" {
-		return nil, fmt.Errorf("invalid configuration")
+	if autoOffsetReset == "" {
+		log.Printf("env variable TC_KAFKA_AUTO_OFFSET_RESET must be set")
+	}
+	topic := os.Getenv("PROXY_KAFKA_TOPIC")
+	if topic == "" {
+		log.Printf("env variable PROXY_KAFKA_TOPIC must be set")
 	}
 
 	return NewKafkaService(bootstrapServers, groupId, autoOffsetReset)
@@ -112,7 +119,11 @@ func (tr *TrafficReporter) ProduceTrafficConsumedEvent(in, out int64) error {
 		return serializationErr
 	}
 
-	outboxEvent := events.NewOutboxEvent(0, string(eventJson), false)
+	outboxEvent, outboxEventValidationErr := events.NewOutboxEvent(0, string(eventJson), false, "NewUserConsumedTrafficEvent")
+	if outboxEventValidationErr != nil {
+		return outboxEventValidationErr
+	}
+
 	produceErr := tr.messageBus.Produce("user-traffic", outboxEvent)
 	if produceErr != nil {
 		log.Printf("Could not produce outbox event: %v", produceErr)
