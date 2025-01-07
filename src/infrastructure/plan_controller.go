@@ -201,7 +201,7 @@ func (p *PlanController) produceUserWithNoPlanEvent(userId int) error {
 		return outboxEventValidationErr
 	}
 
-	produceErr := p.messageBus.Produce("PLAN", outboxEvent)
+	produceErr := p.messageBus.Produce(fmt.Sprintf("%s", config.PROXY), outboxEvent)
 	if produceErr != nil {
 		return produceErr
 	}
@@ -222,7 +222,7 @@ func (p *PlanController) produceUserExceededTrafficLimitEvent(userId int) error 
 		return outboxEventValidationErr
 	}
 
-	produceErr := p.messageBus.Produce("PLAN", outboxEvent)
+	produceErr := p.messageBus.Produce(fmt.Sprintf("%s", config.PROXY), outboxEvent)
 	if produceErr != nil {
 		return produceErr
 	}
