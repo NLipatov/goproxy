@@ -61,7 +61,10 @@ func (p *Proxy) handleHttps(clientConn net.Conn, r *http.Request, userId int) {
 
 	_, _ = clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 
-	rep := p.newTrafficReporter(userId)
+	rep, repErr := p.newTrafficReporter(userId)
+	if repErr != nil {
+		log.Fatalf("failed to build traffic reporter: %s", repErr)
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -152,7 +155,10 @@ func (p *Proxy) handleHttpOnce(clientConn net.Conn, r *http.Request, userId int)
 		_ = serverConn.Close()
 	}(serverConn)
 
-	rep := p.newTrafficReporter(userId)
+	rep, repErr := p.newTrafficReporter(userId)
+	if repErr != nil {
+		log.Fatalf("failed to build traffic reporter: %s", repErr)
+	}
 
 	pr, pw := io.Pipe()
 	go func() {
@@ -176,7 +182,7 @@ func (p *Proxy) handleHttpOnce(clientConn net.Conn, r *http.Request, userId int)
 	return nil
 }
 
-func (p *Proxy) newTrafficReporter(userId int) *TrafficReporter {
+func (p *Proxy) newTrafficReporter(userId int) (*TrafficReporter, error) {
 	return NewTrafficReporter(
 		userId,
 		1*1024*1024,

@@ -19,16 +19,16 @@ func NewDomainEventRepository(db *sql.DB) (*DomainEventRepository, error) {
 }
 
 const getByIdQuery = `
-	SELECT id, payload, published FROM public.outbox 
+	SELECT id, payload, published, event_type FROM public.outbox 
     WHERE id = $1
 `
 
 const createQuery = `
-	INSERT INTO public.outbox (payload) VALUES ($1) RETURNING id
+	INSERT INTO public.outbox (payload, event_type) VALUES ($1, $2) RETURNING id
 `
 
 const updateQuery = `
-	UPDATE public.outbox SET payload = $1 WHERE id = $2
+	UPDATE public.outbox SET payload = $1, event_type = $2 WHERE id = $3
 `
 
 const deleteQuery = `DELETE FROM public.outbox WHERE id = $1`
@@ -37,10 +37,11 @@ func (d DomainEventRepository) GetById(id int) (events.OutboxEvent, error) {
 	var payload string
 	var published bool
 	var resultId int
+	var eventType string
 
 	err := d.db.
 		QueryRow(getByIdQuery, id).
-		Scan(&resultId, &payload, &published)
+		Scan(&resultId, &payload, &published, &eventType)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return events.OutboxEvent{}, fmt.Errorf("event not found: %v", err)
@@ -48,12 +49,12 @@ func (d DomainEventRepository) GetById(id int) (events.OutboxEvent, error) {
 		return events.OutboxEvent{}, fmt.Errorf("could not load event: %v", err)
 	}
 
-	return events.NewOutboxEvent(resultId, payload, published), nil
+	return events.NewOutboxEvent(resultId, payload, published, eventType)
 }
 
 func (d DomainEventRepository) Create(event events.OutboxEvent) (int, error) {
 	var id int
-	err := d.db.QueryRow(createQuery, event.Payload).Scan(&id)
+	err := d.db.QueryRow(createQuery, event.Payload, event.EventType.Value()).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("could not create event: %v", err)
 	}
@@ -61,7 +62,7 @@ func (d DomainEventRepository) Create(event events.OutboxEvent) (int, error) {
 }
 
 func (d DomainEventRepository) Update(event events.OutboxEvent) error {
-	result, err := d.db.Exec(updateQuery, event.Payload, event.Id)
+	result, err := d.db.Exec(updateQuery, event.Payload, event.EventType.Value(), event.Id)
 	if err != nil {
 		return fmt.Errorf("could not update event: %v", err)
 	}

@@ -2,16 +2,19 @@ package infrastructure
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"goproxy/application"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/events"
+	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/dto"
 	"log"
-	"os"
 	"strings"
 	"time"
 )
+
+var userWithNoPlan = errors.New("user with no plan")
 
 type PlanController struct {
 	userPlanRepo   application.UserPlanRepository
@@ -69,8 +72,13 @@ func (p *PlanController) ProcessEvents() {
 		_ = messageBus.Close()
 	}(p.messageBus)
 
-	userTrafficTopic := os.Getenv("KAFKA_TOPIC")
-	topics := []string{userTrafficTopic}
+	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(config.PLAN)
+	if kafkaConfigErr != nil {
+		log.Fatalf("Error creating kafka config: %v", kafkaConfigErr)
+	}
+
+	trafficTopic := kafkaConfig.Topic
+	topics := []string{trafficTopic}
 	err := p.messageBus.Subscribe(topics)
 	if err != nil {
 		log.Fatalf("Failed to subscribe to topics: %s", err)
@@ -79,16 +87,18 @@ func (p *PlanController) ProcessEvents() {
 	log.Printf("Subscribed to topics: %s", strings.Join(topics, ", "))
 
 	for {
-		event, readErr := p.messageBus.Consume()
-		if readErr == nil {
-			p.consume(event)
-		} else {
-			log.Printf("Consumer error: %v (%v)\n", readErr, event)
+		event, consumeErr := p.messageBus.Consume()
+		if consumeErr != nil {
+			log.Printf("failed to consume from message bus: %s", consumeErr)
+		}
+
+		if event.EventType.Value() == "UserConsumedTrafficEvent" {
+			p.consumeUserConsumedTraffic(event)
 		}
 	}
 }
 
-func (p *PlanController) consume(outboxEvent *events.OutboxEvent) {
+func (p *PlanController) consumeUserConsumedTraffic(outboxEvent *events.OutboxEvent) {
 	var event events.UserConsumedTrafficEvent
 	err := json.Unmarshal([]byte(outboxEvent.Payload), &event)
 	if err != nil {
@@ -98,17 +108,19 @@ func (p *PlanController) consume(outboxEvent *events.OutboxEvent) {
 
 	currentTraffic, err := p.cache.Get(p.cacheKey(event.UserId))
 	if err != nil {
-		//if cache miss
+		newUserTraffic := dto.UserTraffic{}
+		//if cache miss - try load it form DB
 		if strings.Contains(err.Error(), "not found") {
-			newUserTraffic, loadErr := p.loadFromDB(event.UserId)
+			dbResult, loadErr := p.loadFromDB(event.UserId)
 			if loadErr != nil {
-				return
+				if errors.Is(loadErr, userWithNoPlan) {
+					_ = p.produceUserWithNoPlanEvent(event.UserId)
+				}
 			}
-			currentTraffic = newUserTraffic
-		} else {
-			// produce user without plan event
-			return
+			newUserTraffic = dbResult
 		}
+
+		currentTraffic = newUserTraffic
 	}
 
 	currentTraffic.InBytes += event.InBytes
@@ -117,8 +129,14 @@ func (p *PlanController) consume(outboxEvent *events.OutboxEvent) {
 
 	err = p.cache.Set(p.cacheKey(event.UserId), currentTraffic)
 	if err != nil {
-		log.Printf("failed to update traffic: %v", err)
-		return
+		log.Printf("cache update err: %v", err)
+	}
+
+	if currentTraffic.OutBytes+currentTraffic.InBytes > currentTraffic.PlanLimitBytes {
+		produceErr := p.produceUserExceededTrafficLimitEvent(event.UserId)
+		if produceErr != nil {
+			log.Printf("could not produce user exceeded traffic limit event: %s", produceErr)
+		}
 	}
 }
 
@@ -136,35 +154,10 @@ func (p *PlanController) getUserActivePlan(userId int) (aggregates.UserPlan, err
 }
 
 func (p *PlanController) loadFromDB(userId int) (dto.UserTraffic, error) {
-	userPlanRow, userPlanRowFetchErr := p.getUserActivePlan(userId)
-	if userPlanRowFetchErr != nil {
-		if userPlanRowFetchErr.Error() == "sql: no rows in result set" {
-			//Produce user without plan event
-			log.Printf("failed to fetch user plan row: %s", userPlanRowFetchErr)
-			return dto.UserTraffic{}, fmt.Errorf("user does not have a plan")
-		}
+	activePlan, err := p.loadUserPlan(userId)
+	if err != nil {
+		return dto.UserTraffic{}, err
 	}
-
-	activePlan, activePlanFetchErr := p.planRepository.GetById(userPlanRow.PlanId())
-	if activePlanFetchErr != nil {
-		//Produce user without plan event
-		userConsumedTrafficWithoutPlan := events.NewUserConsumedTrafficWithoutPlan(userId)
-		data, serializationErr := json.Marshal(userConsumedTrafficWithoutPlan)
-		if serializationErr != nil {
-			log.Fatalf("failed to serialize user consumed a traffic without a plan event: %s", serializationErr)
-			return dto.UserTraffic{}, serializationErr
-		}
-		outboxEvent := events.NewOutboxEvent(0, string(data), false)
-
-		produceErr := p.messageBus.Produce("user-plans", outboxEvent)
-		if produceErr != nil {
-			log.Fatalf("failed to produce user consumed a traffic without a plan event: %s", produceErr)
-		}
-
-		log.Printf("failed to fetch active plan: %s", activePlanFetchErr)
-		return dto.UserTraffic{}, fmt.Errorf("user does not have a plan")
-	}
-
 	userTraffic := dto.UserTraffic{
 		InBytes:        0,
 		OutBytes:       0,
@@ -179,4 +172,60 @@ func (p *PlanController) loadFromDB(userId int) (dto.UserTraffic, error) {
 	_ = p.cache.Expire(p.cacheKey(userId), 24*time.Hour*time.Duration(activePlan.DurationDays()))
 
 	return userTraffic, nil
+}
+
+func (p *PlanController) loadUserPlan(userId int) (aggregates.Plan, error) {
+	userPlanRow, userPlanRowFetchErr := p.getUserActivePlan(userId)
+	if userPlanRowFetchErr != nil {
+		return aggregates.Plan{}, userWithNoPlan
+	}
+
+	activePlan, activePlanFetchErr := p.planRepository.GetById(userPlanRow.PlanId())
+	if activePlanFetchErr != nil {
+		return aggregates.Plan{}, userWithNoPlan
+	}
+
+	return activePlan, nil
+}
+
+func (p *PlanController) produceUserWithNoPlanEvent(userId int) error {
+	userConsumedTrafficWithoutPlan := events.NewUserConsumedTrafficWithoutPlan(userId)
+	data, serializationErr := json.Marshal(userConsumedTrafficWithoutPlan)
+	if serializationErr != nil {
+		log.Fatalf("failed to serialize user consumed a traffic without a plan event: %s", serializationErr)
+		return serializationErr
+	}
+
+	outboxEvent, outboxEventValidationErr := events.NewOutboxEvent(0, string(data), false, "UserConsumedTrafficWithoutPlan")
+	if outboxEventValidationErr != nil {
+		return outboxEventValidationErr
+	}
+
+	produceErr := p.messageBus.Produce(fmt.Sprintf("%s", config.PROXY), outboxEvent)
+	if produceErr != nil {
+		return produceErr
+	}
+
+	return nil
+}
+
+func (p *PlanController) produceUserExceededTrafficLimitEvent(userId int) error {
+	userExceededTrafficLimit := events.NewUserExceededTrafficLimitEvent(userId)
+	data, serializationErr := json.Marshal(userExceededTrafficLimit)
+	if serializationErr != nil {
+		log.Fatalf("failed to serialize user exceeded traffic limit event: %s", serializationErr)
+		return serializationErr
+	}
+
+	outboxEvent, outboxEventValidationErr := events.NewOutboxEvent(0, string(data), false, "UserExceededTrafficLimitEvent")
+	if outboxEventValidationErr != nil {
+		return outboxEventValidationErr
+	}
+
+	produceErr := p.messageBus.Produce(fmt.Sprintf("%s", config.PROXY), outboxEvent)
+	if produceErr != nil {
+		return produceErr
+	}
+
+	return nil
 }
