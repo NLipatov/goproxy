@@ -2,10 +2,11 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"goproxy/application"
 	"goproxy/domain/events"
+	"goproxy/infrastructure/config"
 	"log"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,7 +25,12 @@ type TrafficReporter struct {
 }
 
 func NewTrafficReporter(userId int, threshold int64, interval time.Duration) (*TrafficReporter, error) {
-	messageBusService, err := instantiateMessageBusService()
+	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(config.PROXY)
+	if kafkaConfigErr != nil {
+		log.Fatalf("Error creating kafka config: %v", kafkaConfigErr)
+	}
+
+	messageBusService, err := NewKafkaService(kafkaConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -36,27 +42,6 @@ func NewTrafficReporter(userId int, threshold int64, interval time.Duration) (*T
 		lastSent:       time.Now().UTC(),
 		messageBus:     messageBusService,
 	}, nil
-}
-
-func instantiateMessageBusService() (application.MessageBusService, error) {
-	bootstrapServers := os.Getenv("KAFKA_BOOTSTRAP_SERVERS")
-	if bootstrapServers == "" {
-		log.Printf("env variable KAFKA_BOOTSTRAP_SERVERS must be set")
-	}
-	groupId := os.Getenv("TC_KAFKA_GROUP_ID")
-	if groupId == "" {
-		log.Printf("env variable TC_KAFKA_GROUP_ID must be set")
-	}
-	autoOffsetReset := os.Getenv("TC_KAFKA_AUTO_OFFSET_RESET")
-	if autoOffsetReset == "" {
-		log.Printf("env variable TC_KAFKA_AUTO_OFFSET_RESET must be set")
-	}
-	topic := os.Getenv("PROXY_KAFKA_TOPIC")
-	if topic == "" {
-		log.Printf("env variable PROXY_KAFKA_TOPIC must be set")
-	}
-
-	return NewKafkaService(bootstrapServers, groupId, autoOffsetReset)
 }
 
 func (tr *TrafficReporter) AddInBytes(n int64) {
@@ -124,7 +109,7 @@ func (tr *TrafficReporter) ProduceTrafficConsumedEvent(in, out int64) error {
 		return outboxEventValidationErr
 	}
 
-	produceErr := tr.messageBus.Produce("user-traffic", outboxEvent)
+	produceErr := tr.messageBus.Produce(fmt.Sprintf("%s", config.PLAN), outboxEvent)
 	if produceErr != nil {
 		log.Printf("Could not produce outbox event: %v", produceErr)
 		return produceErr

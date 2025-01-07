@@ -2,11 +2,11 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"goproxy/application"
 	"goproxy/dal"
 	"goproxy/dal/repositories"
 	"goproxy/infrastructure"
+	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/dto"
 	"goproxy/infrastructure/services"
 	"log"
@@ -26,13 +26,13 @@ func main() {
 	case "kafka-relay":
 		startKafkaRelay()
 	case "plan-controller":
-		startTrafficCollector()
+		startPlanController()
 	default:
 		log.Fatalf("Unsupported mode: %s", mode)
 	}
 }
 
-func startTrafficCollector() {
+func startPlanController() {
 	db, err := dal.ConnectDB()
 	if err != nil {
 		log.Fatal(err)
@@ -41,9 +41,14 @@ func startTrafficCollector() {
 		_ = db.Close()
 	}(db)
 
-	messageBus, newMBErr := instantiateMessageBusService()
-	if newMBErr != nil {
-		log.Fatalf("failed to instantiate message bus service: %s", newMBErr)
+	kafkaConf, kafkaConfErr := config.NewKafkaConfig(config.PLAN)
+	if kafkaConfErr != nil {
+		log.Fatal(kafkaConfErr)
+	}
+
+	messageBusService, err := services.NewKafkaService(kafkaConf)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	redisCache, newRedisClientErr := services.NewRedisCache[dto.UserTraffic]()
@@ -57,7 +62,7 @@ func startTrafficCollector() {
 	controller, err := infrastructure.NewTrafficCollector().
 		UsePlanRepository(planRepo).
 		UseUserPlanRepository(userPlanRepo).
-		UseMessageBus(messageBus).
+		UseMessageBus(messageBusService).
 		UseCache(redisCache).
 		Build()
 
@@ -66,25 +71,6 @@ func startTrafficCollector() {
 	}
 
 	controller.ProcessEvents()
-}
-
-func instantiateMessageBusService() (application.MessageBusService, error) {
-	bootstrapServers := os.Getenv("KAFKA_BOOTSTRAP_SERVERS")
-	groupId := os.Getenv("KAFKA_GROUP_ID")
-	autoOffsetReset := os.Getenv("KAFKA_AUTO_OFFSET_RESET")
-	topic := os.Getenv("KAFKA_TOPIC")
-	plansTopic := os.Getenv("PLANS_KAFKA_TOPIC")
-
-	if groupId == "" || autoOffsetReset == "" || topic == "" || bootstrapServers == "" || plansTopic == "" {
-		return nil, fmt.Errorf("invalid configuration")
-	}
-
-	messageBusService, err := services.NewKafkaService(bootstrapServers, groupId, autoOffsetReset)
-	if err != nil {
-		return nil, err
-	}
-
-	return messageBusService, nil
 }
 
 func startKafkaRelay() {

@@ -83,11 +83,15 @@ services:
       - DB_PORT=${DB_PORT}
       - HTTP_LISTENER_PORT=8888
       - PROXY_KAFKA_TOPIC=${PROXY_KAFKA_TOPIC}
-      - TC_KAFKA_AUTO_OFFSET_RESET=earliest
-      - TC_KAFKA_GROUP_ID=traffic-processor
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - PROXY_KAFKA_AUTO_OFFSET_RESET=earliest
+      - PROXY_KAFKA_GROUP_ID=traffic-processor
+      - PROXY_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - PROXY_KAFKA_TOPIC=${PROXY_KAFKA_TOPIC}
     depends_on:
-      - auth-ctx-migrator
+      init-kafka-topics:
+          condition: service_completed_successfully
+      auth-ctx-migrator:
+        condition: service_completed_successfully
 
   rest-api:
     build:
@@ -148,8 +152,8 @@ services:
       kafka-topics --bootstrap-server kafka:9092 --list
 
       echo -e 'Creating kafka topics'
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic user-traffic --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic user-plans --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic PROXY --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic PLAN --replication-factor 1 --partitions 1
 
       echo -e 'Successfully created the following topics:'
       kafka-topics --bootstrap-server kafka:9092 --list
@@ -196,15 +200,19 @@ services:
       - DB_HOST=${PLANS_DB_HOST}
       - DB_PORT=${PLANS_DB_PORT}
       - DB_DATABASE=${PLANS_DB_DATABASE}
-      - KAFKA_TOPIC=${PROXY_KAFKA_TOPIC}
-      - KAFKA_AUTO_OFFSET_RESET=earliest
-      - KAFKA_GROUP_ID=traffic-processor
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - PROXY_KAFKA_TOPIC=${PROXY_KAFKA_TOPIC}
+      - PLAN_KAFKA_TOPIC=${PLAN_KAFKA_TOPIC}
+      - PLAN_KAFKA_AUTO_OFFSET_RESET=earliest
+      - PLAN_KAFKA_GROUP_ID=traffic-processor
+      - PLAN_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - PROXY_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - PROXY_KAFKA_GROUP_ID=${PROXY_KAFKA_GROUP_ID}
+      - PROXY_KAFKA_AUTO_OFFSET_RESET=${PROXY_KAFKA_AUTO_OFFSET_RESET}
+      - PROXY_KAFKA_TOPIC=${PROXY_KAFKA_TOPIC}
       - TC_CACHE_HOST=${TC_CACHE_HOST}
       - TC_CACHE_PORT=${TC_CACHE_PORT}
       - TC_CACHE_USER=${TC_CACHE_USER}
       - TC_CACHE_PASSWORD=${TC_CACHE_PASSWORD}
-      - PLANS_KAFKA_TOPIC=${PLANS_KAFKA_TOPIC}
     depends_on:
       init-kafka-topics:
         condition: service_completed_successfully

@@ -58,7 +58,7 @@ func TestTrafficReporter_AddInBytes(t *testing.T) {
 	assert.Equal(t, int64(0), atomic.LoadInt64(&reporter.inBytes))
 
 	// should send event
-	mockBus.AssertCalled(t, "Produce", "user-traffic", mock.Anything)
+	mockBus.AssertCalled(t, "Produce", "PROXY", mock.Anything)
 }
 
 func TestTrafficReporter_AddOutBytes(t *testing.T) {
@@ -84,12 +84,12 @@ func TestTrafficReporter_AddOutBytes(t *testing.T) {
 	assert.Equal(t, int64(0), atomic.LoadInt64(&reporter.outBytes))
 
 	// should send event
-	mockBus.AssertCalled(t, "Produce", "user-traffic", mock.Anything)
+	mockBus.AssertCalled(t, "Produce", "PROXY", mock.Anything)
 }
 
 func TestTrafficReporter_SendIntermediate(t *testing.T) {
 	mockBus := new(MockMessageBusService)
-	mockBus.On("Produce", "user-traffic", mock.Anything).Return(nil)
+	mockBus.On("Produce", "PROXY", mock.Anything).Return(nil)
 
 	reporter := &TrafficReporter{
 		userId:     1,
@@ -102,7 +102,7 @@ func TestTrafficReporter_SendIntermediate(t *testing.T) {
 	// will trigger counters flush and event producing
 	reporter.SendIntermediate(100, 200)
 	// was event produced?
-	mockBus.AssertCalled(t, "Produce", "user-traffic", mock.Anything)
+	mockBus.AssertCalled(t, "Produce", "PROXY", mock.Anything)
 	// was counters flushed?
 	assert.Equal(t, int64(0), atomic.LoadInt64(&reporter.outBytes))
 	assert.Equal(t, int64(0), atomic.LoadInt64(&reporter.inBytes))
@@ -111,7 +111,7 @@ func TestTrafficReporter_SendIntermediate(t *testing.T) {
 
 func TestTrafficReporter_ProduceTrafficConsumedEvent(t *testing.T) {
 	mockBus := new(MockMessageBusService)
-	mockBus.On("Produce", "user-traffic", mock.Anything).Return(nil)
+	mockBus.On("Produce", "PROXY", mock.Anything).Return(nil)
 
 	reporter := &TrafficReporter{
 		userId:     1,
@@ -120,7 +120,7 @@ func TestTrafficReporter_ProduceTrafficConsumedEvent(t *testing.T) {
 
 	err := reporter.ProduceTrafficConsumedEvent(100, 200)
 	assert.NoError(t, err)
-	mockBus.AssertCalled(t, "Produce", "user-traffic", mock.Anything)
+	mockBus.AssertCalled(t, "Produce", "PROXY", mock.Anything)
 }
 
 func TestTrafficReporter_ProduceTrafficConsumedEvent_Error(t *testing.T) {
@@ -134,5 +134,5 @@ func TestTrafficReporter_ProduceTrafficConsumedEvent_Error(t *testing.T) {
 
 	err := reporter.ProduceTrafficConsumedEvent(100, 200)
 	assert.Error(t, err)
-	mockBus.AssertCalled(t, "Produce", "user-traffic", mock.Anything)
+	mockBus.AssertCalled(t, "Produce", "PROXY", mock.Anything)
 }

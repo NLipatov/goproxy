@@ -5,8 +5,8 @@ import (
 	"goproxy/application"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/events"
+	"goproxy/infrastructure/config"
 	"log"
-	"os"
 	"strings"
 )
 
@@ -16,11 +16,12 @@ type UserRestrictionService struct {
 }
 
 func NewUserRestrictionService() *UserRestrictionService {
-	bootstrapServers := os.Getenv("UP_KAFKA_BOOTSTRAP_SERVERS")
-	groupId := os.Getenv("UP_KAFKA_GROUP_ID")
-	autoOffsetReset := os.Getenv("UP_KAFKA_AUTO_OFFSET_RESET")
+	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(config.PROXY)
+	if kafkaConfigErr != nil {
+		log.Fatal(kafkaConfigErr)
+	}
 
-	messageBusService, err := NewKafkaService(bootstrapServers, groupId, autoOffsetReset)
+	messageBusService, err := NewKafkaService(kafkaConfig)
 	if err != nil {
 		log.Fatalf("failed to initialize kafka service: %s", err)
 	}
@@ -55,7 +56,7 @@ func (u *UserRestrictionService) ProcessEvents() {
 		_ = messageBus.Close()
 	}(u.messageBus)
 
-	topics := []string{"user-plans"}
+	topics := []string{"PLAN"}
 	err := u.messageBus.Subscribe(topics)
 	if err != nil {
 		log.Fatalf("Failed to subscribe to topics: %s", err)

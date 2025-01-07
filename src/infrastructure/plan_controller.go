@@ -7,9 +7,9 @@ import (
 	"goproxy/application"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/events"
+	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/dto"
 	"log"
-	"os"
 	"strings"
 	"time"
 )
@@ -72,8 +72,13 @@ func (p *PlanController) ProcessEvents() {
 		_ = messageBus.Close()
 	}(p.messageBus)
 
-	userTrafficTopic := os.Getenv("KAFKA_TOPIC")
-	topics := []string{userTrafficTopic}
+	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(config.PLAN)
+	if kafkaConfigErr != nil {
+		log.Fatalf("Error creating kafka config: %v", kafkaConfigErr)
+	}
+
+	trafficTopic := kafkaConfig.Topic
+	topics := []string{trafficTopic}
 	err := p.messageBus.Subscribe(topics)
 	if err != nil {
 		log.Fatalf("Failed to subscribe to topics: %s", err)
@@ -196,7 +201,7 @@ func (p *PlanController) produceUserWithNoPlanEvent(userId int) error {
 		return outboxEventValidationErr
 	}
 
-	produceErr := p.messageBus.Produce("user-plans", outboxEvent)
+	produceErr := p.messageBus.Produce("PLAN", outboxEvent)
 	if produceErr != nil {
 		return produceErr
 	}
@@ -217,7 +222,7 @@ func (p *PlanController) produceUserExceededTrafficLimitEvent(userId int) error 
 		return outboxEventValidationErr
 	}
 
-	produceErr := p.messageBus.Produce("user-plans", outboxEvent)
+	produceErr := p.messageBus.Produce("PLAN", outboxEvent)
 	if produceErr != nil {
 		return produceErr
 	}

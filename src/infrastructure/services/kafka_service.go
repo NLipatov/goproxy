@@ -6,6 +6,7 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"goproxy/application"
 	"goproxy/domain/events"
+	"goproxy/infrastructure/config"
 	"log"
 )
 
@@ -15,11 +16,11 @@ type KafkaService struct {
 	topics   []string
 }
 
-func NewKafkaService(bootstrapServers, groupId, autoOffsetReset string) (application.MessageBusService, error) {
+func NewKafkaService(kafkaConfig config.KafkaConfig) (application.MessageBusService, error) {
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers":  bootstrapServers,
-		"group.id":           groupId,
-		"auto.offset.reset":  autoOffsetReset,
+		"bootstrap.servers":  kafkaConfig.BootstrapServers,
+		"group.id":           kafkaConfig.GroupID,
+		"auto.offset.reset":  kafkaConfig.AutoOffsetReset,
 		"session.timeout.ms": 10000,
 		"fetch.min.bytes":    1,
 		"fetch.wait.max.ms":  10,
@@ -29,7 +30,7 @@ func NewKafkaService(bootstrapServers, groupId, autoOffsetReset string) (applica
 	}
 
 	producer, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": bootstrapServers,
+		"bootstrap.servers": kafkaConfig.BootstrapServers,
 	})
 	if err != nil {
 		_ = consumer.Close()

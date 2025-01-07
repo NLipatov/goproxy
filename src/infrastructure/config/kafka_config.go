@@ -19,32 +19,32 @@ type KafkaConfig struct {
 	Topic            string
 }
 
-func NewKafkaConfig(context BoundedContext) (*KafkaConfig, error) {
+func NewKafkaConfig(context BoundedContext) (KafkaConfig, error) {
 	if context == UNSET {
-		return nil, fmt.Errorf("unset context")
+		return KafkaConfig{}, fmt.Errorf("unset context")
 	}
 
 	bootstrapServers, err := getEnv(context, bootstrapServersKey)
 	if err != nil {
-		return nil, err
+		return KafkaConfig{}, err
 	}
 
 	groupID, err := getEnv(context, groupIdKey)
 	if err != nil {
-		return nil, err
+		return KafkaConfig{}, err
 	}
 
 	autoOffsetReset, err := getEnv(context, offsetKey)
 	if err != nil {
-		return nil, err
+		return KafkaConfig{}, err
 	}
 
 	topic, err := getEnv(context, topicKey)
 	if err != nil {
-		return nil, err
+		return KafkaConfig{}, err
 	}
 
-	return &KafkaConfig{
+	return KafkaConfig{
 		BootstrapServers: bootstrapServers,
 		GroupID:          groupID,
 		AutoOffsetReset:  autoOffsetReset,
