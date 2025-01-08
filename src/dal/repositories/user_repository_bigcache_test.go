@@ -81,7 +81,6 @@ func TestUpdateAndFetch(t *testing.T) {
 	err = cache.Set(key, user)
 	assert.NoError(t, err)
 
-	// Обновление данных
 	updatedUser, err := aggregates.NewUser(3, "seth_doe", make([]byte, 32), make([]byte, 32))
 	if err != nil {
 		t.Fatal(err)
