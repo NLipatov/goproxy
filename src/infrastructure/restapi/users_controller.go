@@ -24,7 +24,7 @@ func NewUsersController(useCases application.UserUseCasesContract) *UsersControl
 }
 
 func (l *UsersController) ServePort(port string) error {
-	log.Printf("REST API is serving port %s", port)
+	log.Printf("Users REST API is serving port %s", port)
 
 	http.HandleFunc("/users", l.handleUsers)
 
