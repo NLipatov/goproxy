@@ -54,9 +54,6 @@ func (u *UserRestrictionService) IsRestricted(user aggregates.User) bool {
 		return cached
 	}
 
-	// set temporal data while waiting for sync with remote cache
-	_ = u.setToLocalCacheWithTTL(user.Id())
-
 	go func() {
 		// check if another goroutine is checking this user in remote cache
 		if _, loaded := remoteCacheLocks.LoadOrStore(key, true); loaded {
@@ -64,29 +61,41 @@ func (u *UserRestrictionService) IsRestricted(user aggregates.User) bool {
 		}
 		defer remoteCacheLocks.Delete(key)
 
-		if cached, err := u.remoteCache.Get(key); err == nil && cached {
-			_ = u.AddToRestrictionList(user)
-		} else if err != nil {
-			log.Printf("Error accessing Redis for user %d: %v", user.Id(), err)
-			_ = u.setToLocalCacheWithTTL(user.Id())
+		restricted, err := u.remoteCache.Get(key)
+		if err != nil {
+			if !strings.Contains(err.Error(), "not found") {
+				log.Printf("Error accessing Redis for user %d: %v", user.Id(), err)
+			}
+
+			restricted = false
 		}
+		_ = u.setToCacheWithTTL(u.localCache, user.Id(), restricted)
 	}()
 
 	return false
 }
 
 func (u *UserRestrictionService) AddToRestrictionList(user aggregates.User) error {
-	return u.setToLocalCacheWithTTL(user.Id())
+	setLocalErr := u.setToCacheWithTTL(u.localCache, user.Id(), true)
+	if setLocalErr != nil {
+		return fmt.Errorf("failed to add to local cache: %v", setLocalErr)
+	}
+	setRemoteErr := u.setToCacheWithTTL(u.remoteCache, user.Id(), true)
+	if setRemoteErr != nil {
+		return fmt.Errorf("failed to add to remote cache: %v", setRemoteErr)
+	}
+
+	return nil
 }
 
-func (u *UserRestrictionService) setToLocalCacheWithTTL(userId int) error {
+func (u *UserRestrictionService) setToCacheWithTTL(cache application.CacheWithTTL[bool], userId int, restricted bool) error {
 	key := u.UserIdToKey(userId)
-	setErr := u.localCache.Set(key, true)
+	setErr := cache.Set(key, restricted)
 	if setErr != nil {
 		return setErr
 	}
 
-	expireErr := u.localCache.Expire(key, userRestrictionServiceTTL)
+	expireErr := cache.Expire(key, userRestrictionServiceTTL)
 	if expireErr != nil {
 		return expireErr
 	}
@@ -95,7 +104,16 @@ func (u *UserRestrictionService) setToLocalCacheWithTTL(userId int) error {
 }
 
 func (u *UserRestrictionService) RemoveFromRestrictionList(user aggregates.User) error {
-	return u.localCache.Expire(u.UserIdToKey(user.Id()), time.Nanosecond)
+	expireLocalErr := u.localCache.Expire(u.UserIdToKey(user.Id()), time.Nanosecond)
+	if expireLocalErr != nil {
+		return expireLocalErr
+	}
+	expireRemoteErr := u.remoteCache.Expire(u.UserIdToKey(user.Id()), time.Nanosecond)
+	if expireRemoteErr != nil {
+		return expireRemoteErr
+	}
+
+	return nil
 }
 
 func (u *UserRestrictionService) ProcessEvents() {
@@ -117,6 +135,11 @@ func (u *UserRestrictionService) ProcessEvents() {
 			log.Printf("failed to consume from message bus: %s", consumeErr)
 		}
 
+		if event == nil {
+			log.Printf("received nil event from message bus")
+			continue
+		}
+
 		if event.EventType.Value() == "UserConsumedTrafficWithoutPlan" {
 			var userConsumedTrafficWithoutPlan events.UserConsumedTrafficWithoutPlan
 			deserializationErr := json.Unmarshal([]byte(event.Payload), &userConsumedTrafficWithoutPlan)
@@ -126,7 +149,8 @@ func (u *UserRestrictionService) ProcessEvents() {
 
 			log.Printf("User %d restricted: UserConsumedTrafficWithoutPlan", userConsumedTrafficWithoutPlan.UserId)
 
-			_ = u.setToLocalCacheWithTTL(userConsumedTrafficWithoutPlan.UserId)
+			_ = u.setToCacheWithTTL(u.remoteCache, userConsumedTrafficWithoutPlan.UserId, true)
+			_ = u.setToCacheWithTTL(u.localCache, userConsumedTrafficWithoutPlan.UserId, true)
 		}
 
 		if event.EventType.Value() == "UserExceededTrafficLimitEvent" {
@@ -138,7 +162,8 @@ func (u *UserRestrictionService) ProcessEvents() {
 
 			log.Printf("User %d restricted: UserExceededTrafficLimitEvent", userExceededTrafficLimitEvent.UserId)
 
-			_ = u.setToLocalCacheWithTTL(userExceededTrafficLimitEvent.UserId)
+			_ = u.setToCacheWithTTL(u.remoteCache, userExceededTrafficLimitEvent.UserId, true)
+			_ = u.setToCacheWithTTL(u.localCache, userExceededTrafficLimitEvent.UserId, true)
 		}
 	}
 }
