@@ -8,6 +8,7 @@ import (
 	"goproxy/infrastructure"
 	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/dto"
+	"goproxy/infrastructure/restapi"
 	"goproxy/infrastructure/services"
 	"log"
 	"os"
@@ -147,8 +148,8 @@ func startHttpRestApi() {
 	cryptoService := services.NewCryptoService(32)
 	useCases := application.NewUserUseCases(userRepository, cryptoService)
 
-	restApiListener := infrastructure.NewHttpRestApiListener(useCases)
-	err = restApiListener.ServePort(port)
+	usersController := restapi.NewUsersController(useCases)
+	err = usersController.ServePort(port)
 	if err != nil {
 		log.Printf("Failed serving port: %v", err)
 	}

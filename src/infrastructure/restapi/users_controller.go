@@ -1,4 +1,4 @@
-package infrastructure
+package restapi
 
 import (
 	"encoding/json"
@@ -13,25 +13,25 @@ import (
 	"strings"
 )
 
-type HttpRestApiListener struct {
+type UsersController struct {
 	userUseCases application.UserUseCasesContract
 }
 
-func NewHttpRestApiListener(useCases application.UserUseCasesContract) *HttpRestApiListener {
-	return &HttpRestApiListener{
+func NewUsersController(useCases application.UserUseCasesContract) *UsersController {
+	return &UsersController{
 		userUseCases: useCases,
 	}
 }
 
-func (l *HttpRestApiListener) ServePort(port string) error {
-	log.Printf("REST API is serving port %s", port)
+func (l *UsersController) ServePort(port string) error {
+	log.Printf("Users REST API is serving port %s", port)
 
 	http.HandleFunc("/users", l.handleUsers)
 
 	return http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 }
 
-func (l *HttpRestApiListener) handleUsers(w http.ResponseWriter, r *http.Request) {
+func (l *UsersController) handleUsers(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST":
 		l.PostUser(w, r)
@@ -44,10 +44,10 @@ func (l *HttpRestApiListener) handleUsers(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (l *HttpRestApiListener) PostUser(w http.ResponseWriter, r *http.Request) {
-	var dto dto.PostUserCommand
+func (l *UsersController) PostUser(w http.ResponseWriter, r *http.Request) {
+	var cmd dto.PostUserCommand
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 512))
-	if err := decoder.Decode(&dto); err != nil {
+	if err := decoder.Decode(&cmd); err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
@@ -55,7 +55,7 @@ func (l *HttpRestApiListener) PostUser(w http.ResponseWriter, r *http.Request) {
 		_ = Body.Close()
 	}(r.Body)
 
-	command, err := dto.ToCreateUserCommand()
+	command, err := cmd.ToCreateUserCommand()
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
@@ -75,7 +75,7 @@ func (l *HttpRestApiListener) PostUser(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(fmt.Sprintf("%d", id)))
 }
 
-func (l *HttpRestApiListener) GetUser(w http.ResponseWriter, r *http.Request) {
+func (l *UsersController) GetUser(w http.ResponseWriter, r *http.Request) {
 	id, err := getUserIdFromQuery(r)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
@@ -92,8 +92,8 @@ func (l *HttpRestApiListener) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dto := dto.FromUser(user)
-	serialized, err := json.Marshal(dto)
+	cmd := dto.FromUser(user)
+	serialized, err := json.Marshal(cmd)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "")
 		return
@@ -107,15 +107,15 @@ func (l *HttpRestApiListener) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (l *HttpRestApiListener) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	var dto dto.DeleteUserCommand
+func (l *UsersController) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	var cmd dto.DeleteUserCommand
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 512))
-	if err := decoder.Decode(&dto); err != nil {
+	if err := decoder.Decode(&cmd); err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	command, err := dto.ToDeleteUserCommandDTO()
+	command, err := cmd.ToDeleteUserCommandDTO()
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
