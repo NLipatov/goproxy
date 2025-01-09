@@ -62,13 +62,13 @@ func (l *HttpListener) ServePort(port string) error {
 			continue
 		}
 
-		isCredentialsValid, userId, authorizationErr := l.authUseCases.Authorize(credentials)
+		authorized, userId, authorizationErr := l.authUseCases.Authorize(credentials)
 		if authorizationErr != nil {
 			log.Printf("Could not authorize: %v", authorizationErr)
 			continue
 		}
-		if !isCredentialsValid {
-			log.Printf("Invalid credentials. Client: %s", clientConn.RemoteAddr())
+		if !authorized {
+			log.Printf("Not authorized: %s", clientConn.RemoteAddr())
 			continue
 		}
 
