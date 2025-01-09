@@ -3,6 +3,9 @@ package services
 import (
 	"bufio"
 	"fmt"
+	"goproxy/application"
+	"goproxy/infrastructure/config"
+	"goproxy/infrastructure/infraerrs"
 	"io"
 	"log"
 	"net"
@@ -14,10 +17,15 @@ import (
 )
 
 type Proxy struct {
+	rateLimiter application.RateLimiterService
 }
 
 func NewProxy() *Proxy {
-	return &Proxy{}
+	rateLimiterConfig := config.LoadRateLimiterConfig()
+
+	return &Proxy{
+		rateLimiter: NewRateLimiter(rateLimiterConfig),
+	}
 }
 
 func (p *Proxy) Proxy(clientConn net.Conn, r *http.Request) {
@@ -72,24 +80,40 @@ func (p *Proxy) handleHttps(clientConn net.Conn, r *http.Request, userId int) {
 	// client → server
 	go func() {
 		defer wg.Done()
-		_ = copyTrafficAndReport(serverConn, clientConn, rep, "in")
+		_ = p.copyTrafficAndReport(userId, host, serverConn, clientConn, rep, "in")
 	}()
 	// server → client
 	go func() {
 		defer wg.Done()
-		_ = copyTrafficAndReport(clientConn, serverConn, rep, "out")
+		_ = p.copyTrafficAndReport(userId, host, clientConn, serverConn, rep, "out")
 	}()
 
 	wg.Wait()
 	rep.SendFinal()
 }
 
-func copyTrafficAndReport(dst io.Writer, src io.Reader, tr *TrafficReporter, direction string) error {
+func (p *Proxy) copyTrafficAndReport(userId int, host string, dst io.Writer, src io.Reader, tr *TrafficReporter, direction string) error {
+	if direction == "in" {
+		defer p.rateLimiter.Done(userId, host)
+	}
+
 	buf := make([]byte, 32*1024)
+	var accumulatedBytes int64
+	const threshold = 1_000_000
 
 	for {
 		n, readErr := src.Read(buf)
 		if n > 0 {
+			if direction == "in" {
+				accumulatedBytes += int64(n)
+				if accumulatedBytes >= threshold {
+					if !p.rateLimiter.Allow(userId, host, accumulatedBytes) {
+						return infraerrs.RateLimitExceededError{}
+					}
+					accumulatedBytes = 0
+				}
+			}
+
 			written, writeErr := dst.Write(buf[:n])
 			if writeErr != nil {
 				return writeErr
@@ -167,13 +191,13 @@ func (p *Proxy) handleHttpOnce(clientConn net.Conn, r *http.Request, userId int)
 	}()
 
 	// Request: PipeReader→serverConn (inBytes)
-	copyRequestErr := copyTrafficAndReport(serverConn, pr, rep, "in")
+	copyRequestErr := p.copyTrafficAndReport(userId, host, serverConn, pr, rep, "in")
 	if copyRequestErr != nil {
 		return fmt.Errorf("copy request error: %w", copyRequestErr)
 	}
 
 	// Response: serverConn→clientConn (outBytes)
-	copyResponseError := copyTrafficAndReport(clientConn, serverConn, rep, "out")
+	copyResponseError := p.copyTrafficAndReport(userId, host, clientConn, serverConn, rep, "out")
 	if copyResponseError != nil {
 		return fmt.Errorf("copy response error: %w", copyResponseError)
 	}

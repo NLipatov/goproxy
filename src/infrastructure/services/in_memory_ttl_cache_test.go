@@ -30,7 +30,7 @@ func TestMapCacheWithTTL_Expire(t *testing.T) {
 		t.Fatalf("unexpected error on Set: %v", err)
 	}
 
-	err = cache.Expire("key1", 2*time.Second)
+	err = cache.Expire("key1", time.Millisecond*100)
 	if err != nil {
 		t.Fatalf("unexpected error on Expire: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestMapCacheWithTTL_Expire(t *testing.T) {
 		t.Fatalf("expected value 'value1', got '%s'", val)
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Millisecond * 100 * 3)
 
 	val, err = cache.Get("key1")
 	if err == nil {
