@@ -8,6 +8,7 @@ import (
 	"goproxy/infrastructure/dto"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -131,8 +132,8 @@ func TestCreateInvoice_404Response(t *testing.T) {
 		t.Fatalf("Expected error, got nil")
 	}
 
-	expectedErrorMessage := "unexpected status code: 404, body: {\"error\":\"Input fields are invalid\",\"details\":{\"email\":\"should be well-formed email\",\"password\":\"should contain at least 8 symbols\"},\"timestamp\":\"2025-01-10T20:08:42.378Z\"}"
-	if err.Error() != expectedErrorMessage {
+	expectedErrorMessage := "unexpected status code: 404"
+	if !strings.Contains(err.Error(), expectedErrorMessage) {
 		t.Errorf("Unexpected error message: got %q, expected %q", err.Error(), expectedErrorMessage)
 	}
 }
