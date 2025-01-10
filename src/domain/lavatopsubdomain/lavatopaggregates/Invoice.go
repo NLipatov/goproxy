@@ -7,6 +7,8 @@ import (
 
 type Invoice struct {
 	id            int
+	extId         string
+	status        lavatopvalueobjects.Status
 	email         valueobjects.Email
 	offerId       valueobjects.Guid
 	periodicity   lavatopvalueobjects.Periodicity
@@ -17,6 +19,8 @@ type Invoice struct {
 
 func NewInvoice(
 	id int,
+	externalId string, // invoice identifier in lava top system
+	status lavatopvalueobjects.Status,
 	email valueobjects.Email,
 	offerId valueobjects.Guid,
 	periodicity lavatopvalueobjects.Periodicity,
@@ -26,6 +30,8 @@ func NewInvoice(
 
 	return Invoice{
 		id:            id,
+		extId:         externalId,
+		status:        status,
 		email:         email,
 		offerId:       offerId,
 		periodicity:   periodicity,
@@ -37,6 +43,14 @@ func NewInvoice(
 
 func (i Invoice) Id() int {
 	return i.id
+}
+
+func (i Invoice) ExtId() string {
+	return i.extId
+}
+
+func (i Invoice) Status() lavatopvalueobjects.Status {
+	return i.status
 }
 
 func (i Invoice) Email() valueobjects.Email {

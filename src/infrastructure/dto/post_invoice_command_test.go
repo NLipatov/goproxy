@@ -18,8 +18,15 @@ func TestToInvoiceDTO(t *testing.T) {
 		t.Fatal(offerIdErr)
 	}
 
+	status, statusErr := lavatopvalueobjects.ParseInvoiceStatus("new")
+	if statusErr != nil {
+		t.Fatal(statusErr)
+	}
+
 	invoice, invoiceErr := lavatopaggregates.NewInvoice(
 		1,
+		"e624e74b-a109-4775-b8e2-be27ce89a0b8",
+		status,
 		email,
 		offerId,
 		lavatopvalueobjects.ONE_TIME,
