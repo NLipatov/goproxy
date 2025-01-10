@@ -22,6 +22,6 @@ func (l *LavaTopUseCases) PublishInvoice(invoice lavatopaggregates.Invoice, user
 	}
 
 	//save published invoice to db and associate it with userId
-	fmt.Printf("Published Invoice with ID: %d\n", publishedInvoice.Id)
-	return publishedInvoice, nil
+	fmt.Printf("Published Invoice with ID: %d, user id: %d", publishedInvoice.Id(), userId)
+	panic("not implemented")
 }
