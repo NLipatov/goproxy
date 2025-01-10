@@ -81,7 +81,7 @@ func TestPlansRepository(t *testing.T) {
 func insertTestPlan(repo *PlanRepository, t *testing.T) int {
 	name := fmt.Sprintf("Test Plan %d", time.Now().UTC().UnixNano())
 	plan, err := aggregates.NewPlan(-1, name, 1000000, 30)
-	assertNoError(t, err, "Failed to create test plan aggregate")
+	assertNoError(t, err, "Failed to create test plan lavatopaggregates")
 
 	id, err := repo.Create(plan)
 	assertNoError(t, err, "Failed to insert test plan")
