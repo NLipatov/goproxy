@@ -72,7 +72,7 @@ func TestUserRepository(t *testing.T) {
 func insertTestUser(repo *UserRepository, t *testing.T) int {
 	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
 	user, err := aggregates.NewUser(-1, username, []byte("hashed_password"), []byte("salt"))
-	assertNoError(t, err, "Failed to create test user aggregate")
+	assertNoError(t, err, "Failed to create test user lavatopaggregates")
 	id, err := repo.Create(user)
 	assertNoError(t, err, "Failed to insert test user")
 	return id

@@ -82,7 +82,7 @@ func insertTestUserPlan(repo *UserPlanRepository, planId int, t *testing.T) int 
 	createdAt := time.Now()
 
 	userPlan, err := aggregates.NewUserPlan(-1, userId, planId, validTo, createdAt)
-	assertNoError(t, err, "Failed to create test user plan aggregate")
+	assertNoError(t, err, "Failed to create test user plan lavatopaggregates")
 
 	id, err := repo.Create(userPlan)
 	assertNoError(t, err, "Failed to insert test user plan")
