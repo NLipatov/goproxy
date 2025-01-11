@@ -3,30 +3,32 @@ package application
 import (
 	"fmt"
 	"goproxy/domain/lavatopsubdomain/lavatopaggregates"
+	"goproxy/domain/lavatopsubdomain/lavatopvalueobjects"
 )
 
 type LavaTopUseCases struct {
-	billingService BillingService[lavatopaggregates.Invoice, lavatopaggregates.Offer]
+	invoiceRepository InvoiceRepository[lavatopaggregates.Invoice]
+	billingService    BillingService[lavatopaggregates.Invoice, lavatopvalueobjects.Offer]
 }
 
-func NewLavaTopUseCases(billingService BillingService[lavatopaggregates.Invoice, lavatopaggregates.Offer]) LavaTopUseCases {
+func NewLavaTopUseCases(billingService BillingService[lavatopaggregates.Invoice, lavatopvalueobjects.Offer]) LavaTopUseCases {
 	return LavaTopUseCases{
 		billingService: billingService,
 	}
 }
 
-func (l *LavaTopUseCases) GetOffers() ([]lavatopaggregates.Offer, error) {
+func (l *LavaTopUseCases) GetOffers() ([]lavatopvalueobjects.Offer, error) {
 	return l.billingService.GetOffers()
 }
 
-func (l *LavaTopUseCases) PublishInvoice(invoice lavatopaggregates.Invoice, userId int) (lavatopaggregates.Invoice, error) {
+func (l *LavaTopUseCases) PublishInvoice(invoice lavatopaggregates.Invoice) (lavatopaggregates.Invoice, error) {
 	publishedInvoice, err := l.billingService.PublishInvoice(invoice)
 	if err != nil {
 		return lavatopaggregates.Invoice{}, err
 	}
 
 	//save published invoice to db and associate it with userId
-	fmt.Printf("Published Invoice with ID: %d, user id: %d", publishedInvoice.Id(), userId)
+	fmt.Printf("Published Invoice with ID: %d, user id: %d", publishedInvoice.Id(), invoice.UserId())
 	panic("not implemented")
 }
 

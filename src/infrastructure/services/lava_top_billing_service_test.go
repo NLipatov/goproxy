@@ -37,15 +37,17 @@ func TestPublishInvoice(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
+	userId := 2
 	email, _ := valueobjects.ParseEmailFromString("example@example.com")
-	offerId, _ := valueobjects.ParseGuidFromString("6c0cf730-3432-4755-941b-ca23b419d6df")
+	offer := lavatopvalueobjects.NewOffer("6c0cf730-3432-4755-941b-ca23b419d6df", "1 Month Plan", make([]lavatopvalueobjects.Price, 0))
 	status, _ := lavatopvalueobjects.ParseInvoiceStatus("new")
 	invoice, _ := lavatopaggregates.NewInvoice(
 		1,
+		userId,
 		"",
 		status,
 		email,
-		offerId,
+		offer,
 		lavatopvalueobjects.ONE_TIME,
 		lavatopvalueobjects.RUB,
 		lavatopvalueobjects.BANK131,
@@ -62,12 +64,16 @@ func TestPublishInvoice(t *testing.T) {
 		t.Fatalf("PublishInvoice returned error: %v", err)
 	}
 
+	if updatedInvoice.UserId() != userId {
+		t.Errorf("Expected userId %d, got %d", userId, invoice.UserId())
+	}
+
 	if updatedInvoice.Id() != invoice.Id() {
 		t.Errorf("Expected ID %d, got %d", invoice.Id(), updatedInvoice.Id())
 	}
 
-	if updatedInvoice.OfferId() != invoice.OfferId() {
-		t.Errorf("Expected OfferId %s, got %s", invoice.OfferId().String(), updatedInvoice.OfferId().String())
+	if updatedInvoice.Offer().ExtId() != invoice.Offer().ExtId() {
+		t.Errorf("Expected Offer %s, got %s", invoice.Offer().ExtId(), updatedInvoice.Offer().ExtId())
 	}
 
 	if updatedInvoice.Status().String() != mockResponse.Status {
@@ -107,15 +113,17 @@ func TestPublishInvoice_404Response(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
+	userId := 2
 	email, _ := valueobjects.ParseEmailFromString("invalid_email")
-	offerId, _ := valueobjects.ParseGuidFromString("6c0cf730-3432-4755-941b-ca23b419d6df")
+	offer := lavatopvalueobjects.NewOffer("6c0cf730-3432-4755-941b-ca23b419d6df", "1 Month Plan", make([]lavatopvalueobjects.Price, 0))
 	status, _ := lavatopvalueobjects.ParseInvoiceStatus("new")
 	invoice, _ := lavatopaggregates.NewInvoice(
 		1,
+		userId,
 		"",
 		status,
 		email,
-		offerId,
+		offer,
 		lavatopvalueobjects.ONE_TIME,
 		lavatopvalueobjects.RUB,
 		lavatopvalueobjects.BANK131,
@@ -282,34 +290,60 @@ func TestGetOffers(t *testing.T) {
 		t.Fatalf("GetOffers returned error: %v", err)
 	}
 
-	expectedOfferCount := 3
+	expectedOfferCount := 1
 	if len(offers) != expectedOfferCount {
 		t.Errorf("Expected %d offers, got %d", expectedOfferCount, len(offers))
 	}
 
-	expectedOffer := lavatopaggregates.NewOffer(
+	eurPrice := lavatopvalueobjects.NewPrice(48, lavatopvalueobjects.EUR, lavatopvalueobjects.ONE_TIME)
+	rubPrice := lavatopvalueobjects.NewPrice(5000, lavatopvalueobjects.RUB, lavatopvalueobjects.ONE_TIME)
+	usdPrice := lavatopvalueobjects.NewPrice(49, lavatopvalueobjects.USD, lavatopvalueobjects.ONE_TIME)
+	prices := []lavatopvalueobjects.Price{eurPrice, rubPrice, usdPrice}
+
+	expectedOffer := lavatopvalueobjects.NewOffer(
 		"6c0cf730-3432-4755-941b-ca23b419d6df",
 		"1 Month Plan",
-		lavatopvalueobjects.NewPrice(50*100, lavatopvalueobjects.RUB, lavatopvalueobjects.ONE_TIME),
+		prices,
 	)
 
-	if offers[1].ExtId() != expectedOffer.ExtId() {
-		t.Errorf("Expected offer ID %s, got %s", expectedOffer.ExtId(), offers[1].ExtId())
+	if offers[0].ExtId() != expectedOffer.ExtId() {
+		t.Errorf("Expected offer ID %s, got %s", expectedOffer.ExtId(), offers[0].ExtId())
 	}
 
-	if offers[1].Name() != expectedOffer.Name() {
-		t.Errorf("Expected offer name %s, got %s", expectedOffer.Name(), offers[1].Name())
+	if offers[0].Name() != expectedOffer.Name() {
+		t.Errorf("Expected offer name %s, got %s", expectedOffer.Name(), offers[0].Name())
 	}
 
-	if offers[1].Price().Cents() != expectedOffer.Price().Cents() {
-		t.Errorf("Expected price %d, got %d", expectedOffer.Price().Cents(), offers[1].Price().Cents())
+	if offers[0].Prices()[0].Cents() != expectedOffer.Prices()[0].Cents() {
+		t.Errorf("Expected price %d, got %d", expectedOffer.Prices()[0].Cents(), offers[0].Prices()[0].Cents())
 	}
 
-	if offers[1].Price().Currency() != expectedOffer.Price().Currency() {
-		t.Errorf("Expected currency %s, got %s", expectedOffer.Price().Currency(), offers[1].Price().Currency())
+	if offers[0].Prices()[0].Currency() != expectedOffer.Prices()[0].Currency() {
+		t.Errorf("Expected currency %s, got %s", expectedOffer.Prices()[0].Currency(), offers[0].Prices()[0].Currency())
 	}
 
-	if offers[1].Price().Periodicity() != expectedOffer.Price().Periodicity() {
-		t.Errorf("Expected periodicity %s, got %s", expectedOffer.Price().Periodicity(), offers[1].Price().Periodicity())
+	if offers[0].Prices()[0].Periodicity() != expectedOffer.Prices()[0].Periodicity() {
+		t.Errorf("Expected periodicity %s, got %s", expectedOffer.Prices()[0].Periodicity(), offers[0].Prices()[0].Periodicity())
+	}
+
+	expectedPrices := make(map[string]lavatopvalueobjects.Price)
+	for _, price := range expectedOffer.Prices() {
+		expectedPrices[price.Currency().String()] = price
+	}
+
+	for _, price := range offers[0].Prices() {
+		expectedPrice, exists := expectedPrices[price.Currency().String()]
+		if !exists {
+			t.Errorf("Expected price for currency %s, but it was not found", price.Currency().String())
+			continue
+		}
+
+		if expectedPrice.Cents() != price.Cents() {
+			t.Errorf("Expected %d cents for currency %s, got %d", price.Cents(), price.Currency().String(), expectedPrice.Cents())
+		}
+
+		if expectedPrice.Periodicity() != price.Periodicity() {
+			t.Errorf("Expected periodicity %s for currency %s, got %s", price.Periodicity(), price.Currency(), expectedPrice.Periodicity())
+		}
 	}
 }

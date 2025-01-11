@@ -49,31 +49,34 @@ func NewLavaTopBillingService() LavaTopBillingService {
 	}
 }
 
-func (l *LavaTopBillingService) GetOffers() ([]lavatopaggregates.Offer, error) {
+func (l *LavaTopBillingService) GetOffers() ([]lavatopvalueobjects.Offer, error) {
 	var apiResponse dto.GetOffersResponse
 	err := l.doRequest(http.MethodGet, l.getOffersUrl, nil, &apiResponse)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch offers: %w", err)
 	}
 
-	var offers []lavatopaggregates.Offer
+	var offers []lavatopvalueobjects.Offer
 	for _, product := range apiResponse.Items {
 		for _, offer := range product.Offers {
-			for _, price := range offer.Prices {
-				periodicity, err := lavatopvalueobjects.ParsePeriodicity(price.Periodicity)
-				if err != nil {
-					return nil, fmt.Errorf("invalid periodicity in offer %s: %w", offer.ID, err)
+			prices := make([]lavatopvalueobjects.Price, len(offer.Prices))
+			for i, price := range offer.Prices {
+				currency, currencyErr := lavatopvalueobjects.ParseCurrency(price.Currency)
+				if currencyErr != nil {
+					log.Printf("failed to parse currency %s", price.Currency)
+					currency = lavatopvalueobjects.RUB
 				}
-				currency, err := lavatopvalueobjects.ParseCurrency(price.Currency)
-				if err != nil {
-					return nil, fmt.Errorf("invalid currency in offer %s: %w", offer.ID, err)
-				}
-				cents := int64(price.Amount * 100)
 
-				priceObject := lavatopvalueobjects.NewPrice(cents, currency, periodicity)
-				offerObject := lavatopaggregates.NewOffer(offer.ID, offer.Name, priceObject)
-				offers = append(offers, offerObject)
+				periodicity, periodicityErr := lavatopvalueobjects.ParsePeriodicity(price.Periodicity)
+				if periodicityErr != nil {
+					log.Printf("failed to parse periodicity %s", price.Periodicity)
+					periodicity = lavatopvalueobjects.ONE_TIME
+				}
+
+				prices[i] = lavatopvalueobjects.NewPrice(int64(price.Amount*100), currency, periodicity)
 			}
+			object := lavatopvalueobjects.NewOffer(offer.ID, offer.Name, prices)
+			offers = append(offers, object)
 		}
 	}
 
@@ -116,10 +119,11 @@ func (l *LavaTopBillingService) PublishInvoice(invoice lavatopaggregates.Invoice
 
 	updatedInvoice, err := lavatopaggregates.NewInvoice(
 		invoice.Id(),
+		2,
 		successResponse.ID,
 		updatedStatus,
 		invoice.Email(),
-		invoice.OfferId(),
+		invoice.Offer(),
 		invoice.Periodicity(),
 		invoice.Currency(),
 		invoice.PaymentMethod(),
