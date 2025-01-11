@@ -16,6 +16,7 @@ import (
 type LavaTopBillingService struct {
 	getInvoiceUrl  string
 	postInvoiceUrl string
+	getOffersUrl   string
 	apiKey         string
 }
 
@@ -30,20 +31,57 @@ func NewLavaTopBillingService() LavaTopBillingService {
 		log.Fatalf("POST_INVOICE_API_URL environment variable not set")
 	}
 
+	getOffersUrl := os.Getenv("GET_OFFERS_API_URL")
+	if getOffersUrl == "" {
+		log.Fatalf("GET_OFFERS_API_URL environment variable not set")
+	}
+
 	apiKey := os.Getenv("LAVATOP_API_KEY")
 	if apiKey == "" {
 		log.Fatalf("LAVATOP_API_KEY environment variable not set")
 	}
 
 	return LavaTopBillingService{
+		getOffersUrl:   getOffersUrl,
 		getInvoiceUrl:  getInvoiceUrl,
 		postInvoiceUrl: postInvoiceUrl,
 		apiKey:         apiKey,
 	}
 }
 
-func (l *LavaTopBillingService) GetInvoiceStatus(offerId string) (string, error) {
-	url := fmt.Sprintf("%s?id=%s", l.getInvoiceUrl, offerId)
+func (l *LavaTopBillingService) GetOffers() ([]lavatopaggregates.Offer, error) {
+	var apiResponse dto.GetOffersResponse
+	err := l.doRequest(http.MethodGet, l.getOffersUrl, nil, &apiResponse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch offers: %w", err)
+	}
+
+	var offers []lavatopaggregates.Offer
+	for _, product := range apiResponse.Items {
+		for _, offer := range product.Offers {
+			for _, price := range offer.Prices {
+				periodicity, err := lavatopvalueobjects.ParsePeriodicity(price.Periodicity)
+				if err != nil {
+					return nil, fmt.Errorf("invalid periodicity in offer %s: %w", offer.ID, err)
+				}
+				currency, err := lavatopvalueobjects.ParseCurrency(price.Currency)
+				if err != nil {
+					return nil, fmt.Errorf("invalid currency in offer %s: %w", offer.ID, err)
+				}
+				cents := int64(price.Amount * 100)
+
+				priceObject := lavatopvalueobjects.NewPrice(cents, currency, periodicity)
+				offerObject := lavatopaggregates.NewOffer(offer.ID, offer.Name, priceObject)
+				offers = append(offers, offerObject)
+			}
+		}
+	}
+
+	return offers, nil
+}
+
+func (l *LavaTopBillingService) GetInvoiceStatus(extId string) (string, error) {
+	url := fmt.Sprintf("%s?id=%s", l.getInvoiceUrl, extId)
 	var successResponse dto.InvoicePaymentParamsResponse
 
 	err := l.doRequest(http.MethodGet, url, nil, &successResponse)

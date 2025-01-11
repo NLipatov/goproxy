@@ -4,7 +4,8 @@ import (
 	"goproxy/domain/contracts"
 )
 
-type BillingService[T contracts.Invoice] interface {
+type BillingService[I contracts.Invoice, O contracts.Offer] interface {
+	GetOffers() ([]O, error)
+	PublishInvoice(invoice I) (I, error)
 	GetInvoiceStatus(offerId string) (string, error)
-	PublishInvoice(invoice T) (T, error)
 }

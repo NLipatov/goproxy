@@ -224,3 +224,92 @@ func TestGetInvoiceStatus_404Response(t *testing.T) {
 		t.Errorf("Error message should include details: got %q, expected to contain %q", err.Error(), expectedErrorDetails)
 	}
 }
+
+func TestGetOffers(t *testing.T) {
+	mockResponse := dto.GetOffersResponse{
+		Items: []dto.ProductResponse{
+			{
+				ID:    "c48a74d5-92f7-4671-b560-3d2635fc3f80",
+				Title: "1 Month Plan",
+				Offers: []dto.OfferResponse{
+					{
+						ID:   "6c0cf730-3432-4755-941b-ca23b419d6df",
+						Name: "1 Month Plan",
+						Prices: []dto.PriceDto{
+							{
+								Currency:    "EUR",
+								Amount:      0.48,
+								Periodicity: "ONE_TIME",
+							},
+							{
+								Currency:    "RUB",
+								Amount:      50,
+								Periodicity: "ONE_TIME",
+							},
+							{
+								Currency:    "USD",
+								Amount:      0.49,
+								Periodicity: "ONE_TIME",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("Expected GET request, got %s", r.Method)
+		}
+
+		if r.Header.Get("X-Api-Key") == "" {
+			t.Fatal("Missing X-Api-Key header")
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(mockResponse)
+	}))
+	defer mockServer.Close()
+
+	service := LavaTopBillingService{
+		getOffersUrl: mockServer.URL,
+		apiKey:       "test-api-key",
+	}
+
+	offers, err := service.GetOffers()
+	if err != nil {
+		t.Fatalf("GetOffers returned error: %v", err)
+	}
+
+	expectedOfferCount := 3
+	if len(offers) != expectedOfferCount {
+		t.Errorf("Expected %d offers, got %d", expectedOfferCount, len(offers))
+	}
+
+	expectedOffer := lavatopaggregates.NewOffer(
+		"6c0cf730-3432-4755-941b-ca23b419d6df",
+		"1 Month Plan",
+		lavatopvalueobjects.NewPrice(50*100, lavatopvalueobjects.RUB, lavatopvalueobjects.ONE_TIME),
+	)
+
+	if offers[1].ExtId() != expectedOffer.ExtId() {
+		t.Errorf("Expected offer ID %s, got %s", expectedOffer.ExtId(), offers[1].ExtId())
+	}
+
+	if offers[1].Name() != expectedOffer.Name() {
+		t.Errorf("Expected offer name %s, got %s", expectedOffer.Name(), offers[1].Name())
+	}
+
+	if offers[1].Price().Cents() != expectedOffer.Price().Cents() {
+		t.Errorf("Expected price %d, got %d", expectedOffer.Price().Cents(), offers[1].Price().Cents())
+	}
+
+	if offers[1].Price().Currency() != expectedOffer.Price().Currency() {
+		t.Errorf("Expected currency %s, got %s", expectedOffer.Price().Currency(), offers[1].Price().Currency())
+	}
+
+	if offers[1].Price().Periodicity() != expectedOffer.Price().Periodicity() {
+		t.Errorf("Expected periodicity %s, got %s", expectedOffer.Price().Periodicity(), offers[1].Price().Periodicity())
+	}
+}
