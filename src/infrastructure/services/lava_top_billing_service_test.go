@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-func TestCreateInvoice(t *testing.T) {
+func TestPublishInvoice(t *testing.T) {
 	mockResponse := dto.InvoicePaymentParamsResponse{
 		ID:     "e624e74b-a109-4775-b8e2-be27ce89a0b8",
 		Status: "in-progress",
@@ -83,7 +83,7 @@ func TestCreateInvoice(t *testing.T) {
 	}
 }
 
-func TestCreateInvoice_404Response(t *testing.T) {
+func TestPublishInvoice_404Response(t *testing.T) {
 	mockErrorResponse := dto.ErrorResponse{
 		Error: "Input fields are invalid",
 		Details: map[string]string{
@@ -135,5 +135,92 @@ func TestCreateInvoice_404Response(t *testing.T) {
 	expectedErrorMessage := "unexpected status code: 404"
 	if !strings.Contains(err.Error(), expectedErrorMessage) {
 		t.Errorf("Unexpected error message: got %q, expected %q", err.Error(), expectedErrorMessage)
+	}
+}
+
+func TestGetInvoiceStatus(t *testing.T) {
+	mockResponse := dto.InvoicePaymentParamsResponse{
+		ID:     "f1f47a26-4795-420e-8dc1-2260dd065fbb",
+		Status: "in-progress",
+		AmountTotal: dto.AmountTotalDto{
+			Currency: "RUB",
+			Amount:   50,
+		},
+	}
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("Expected GET request, got %s", r.Method)
+		}
+
+		if r.Header.Get("X-Api-Key") == "" {
+			t.Fatal("Missing X-Api-Key header")
+		}
+
+		query := r.URL.Query()
+		if query.Get("id") != mockResponse.ID {
+			t.Fatalf("Expected ID %s, got %s", mockResponse.ID, query.Get("id"))
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(mockResponse)
+	}))
+	defer mockServer.Close()
+
+	service := LavaTopBillingService{
+		getInvoiceUrl: mockServer.URL,
+		apiKey:        "test-api-key",
+	}
+
+	status, err := service.GetInvoiceStatus("f1f47a26-4795-420e-8dc1-2260dd065fbb")
+	if err != nil {
+		t.Fatalf("GetInvoiceStatus returned error: %v", err)
+	}
+
+	expectedStatus := "in-progress"
+	if status != expectedStatus {
+		t.Errorf("Expected status %s, got %s", expectedStatus, status)
+	}
+}
+
+func TestGetInvoiceStatus_404Response(t *testing.T) {
+	mockErrorResponse := map[string]interface{}{
+		"error":     "{\"errors\":[\"Contract with id 'f1f47a26-4795-420e-8dc1-2260dd065f8b' does not exists\"]}",
+		"details":   map[string]interface{}{},
+		"timestamp": "2025-01-11T16:29:57.326842+02:00",
+	}
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("Expected GET request, got %s", r.Method)
+		}
+
+		if r.Header.Get("X-Api-Key") == "" {
+			t.Fatal("Missing X-Api-Key header")
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(mockErrorResponse)
+	}))
+	defer mockServer.Close()
+
+	service := LavaTopBillingService{
+		getInvoiceUrl: mockServer.URL,
+		apiKey:        "test-api-key",
+	}
+
+	_, err := service.GetInvoiceStatus("f1f47a26-4795-420e-8dc1-2260dd065f8b")
+	if err == nil {
+		t.Fatalf("Expected error, got nil")
+	}
+
+	expectedErrorMessage := "unexpected status code: 404"
+	if !strings.Contains(err.Error(), expectedErrorMessage) {
+		t.Errorf("Unexpected error message: got %q, expected %q", err.Error(), expectedErrorMessage)
+	}
+
+	expectedErrorDetails := "Contract with id 'f1f47a26-4795-420e-8dc1-2260dd065f8b' does not exists"
+	if !strings.Contains(err.Error(), expectedErrorDetails) {
+		t.Errorf("Error message should include details: got %q, expected to contain %q", err.Error(), expectedErrorDetails)
 	}
 }
