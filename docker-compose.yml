@@ -37,6 +37,23 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  
+  lt-billing-postgres:
+    image: postgres:17.2-bookworm
+    container_name: lavatop-billing-postgres
+    environment:
+      POSTGRES_USER: ${LT_BILLING_DB_USER}
+      POSTGRES_PASSWORD: ${LT_BILLING_DB_PASS}
+      POSTGRES_DB: ${LT_BILLING_DB_DATABASE}
+    ports:
+      - "5435:5432"
+    volumes:
+      - lt-billing-postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   auth-ctx-migrator:
     build:
@@ -66,6 +83,21 @@ services:
       - DB_PORT=${PLANS_DB_PORT}
     depends_on:
       plan-postgres:
+        condition: service_healthy
+
+  lt-billing-ctx-migrator:
+    build:
+      context: ./src
+    container_name: lt-billing-ctx-migrator
+    environment:
+      - MODE=migrator
+      - DB_DATABASE=${LT_BILLING_DB_DATABASE}
+      - DB_USER=${LT_BILLING_DB_USER}
+      - DB_PASS=${LT_BILLING_DB_PASS}
+      - DB_HOST=${LT_BILLING_DB_HOST}
+      - DB_PORT=${LT_BILLING_DB_PORT}
+    depends_on:
+      lt-billing-postgres:
         condition: service_healthy
         
   proxy:
@@ -225,5 +257,6 @@ services:
 
 volumes:
   postgres_data:
-  plan-postgres_data:
+  plan-postgres_data: 
+  lt-billing-postgres_data:
   plan-controller-cache_data:
