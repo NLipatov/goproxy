@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-func TestCreateInvoice(t *testing.T) {
+func TestPublishInvoice(t *testing.T) {
 	mockResponse := dto.InvoicePaymentParamsResponse{
 		ID:     "e624e74b-a109-4775-b8e2-be27ce89a0b8",
 		Status: "in-progress",
@@ -37,15 +37,17 @@ func TestCreateInvoice(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
+	userId := 2
 	email, _ := valueobjects.ParseEmailFromString("example@example.com")
-	offerId, _ := valueobjects.ParseGuidFromString("6c0cf730-3432-4755-941b-ca23b419d6df")
+	offer := lavatopvalueobjects.NewOffer("6c0cf730-3432-4755-941b-ca23b419d6df", "1 Month Plan", make([]lavatopvalueobjects.Price, 0))
 	status, _ := lavatopvalueobjects.ParseInvoiceStatus("new")
 	invoice, _ := lavatopaggregates.NewInvoice(
 		1,
+		userId,
 		"",
 		status,
 		email,
-		offerId,
+		offer,
 		lavatopvalueobjects.ONE_TIME,
 		lavatopvalueobjects.RUB,
 		lavatopvalueobjects.BANK131,
@@ -62,12 +64,16 @@ func TestCreateInvoice(t *testing.T) {
 		t.Fatalf("PublishInvoice returned error: %v", err)
 	}
 
+	if updatedInvoice.UserId() != userId {
+		t.Errorf("Expected userId %d, got %d", userId, invoice.UserId())
+	}
+
 	if updatedInvoice.Id() != invoice.Id() {
 		t.Errorf("Expected ID %d, got %d", invoice.Id(), updatedInvoice.Id())
 	}
 
-	if updatedInvoice.OfferId() != invoice.OfferId() {
-		t.Errorf("Expected OfferId %s, got %s", invoice.OfferId().String(), updatedInvoice.OfferId().String())
+	if updatedInvoice.Offer().ExtId() != invoice.Offer().ExtId() {
+		t.Errorf("Expected Offer %s, got %s", invoice.Offer().ExtId(), updatedInvoice.Offer().ExtId())
 	}
 
 	if updatedInvoice.Status().String() != mockResponse.Status {
@@ -83,7 +89,7 @@ func TestCreateInvoice(t *testing.T) {
 	}
 }
 
-func TestCreateInvoice_404Response(t *testing.T) {
+func TestPublishInvoice_404Response(t *testing.T) {
 	mockErrorResponse := dto.ErrorResponse{
 		Error: "Input fields are invalid",
 		Details: map[string]string{
@@ -107,15 +113,17 @@ func TestCreateInvoice_404Response(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
+	userId := 2
 	email, _ := valueobjects.ParseEmailFromString("invalid_email")
-	offerId, _ := valueobjects.ParseGuidFromString("6c0cf730-3432-4755-941b-ca23b419d6df")
+	offer := lavatopvalueobjects.NewOffer("6c0cf730-3432-4755-941b-ca23b419d6df", "1 Month Plan", make([]lavatopvalueobjects.Price, 0))
 	status, _ := lavatopvalueobjects.ParseInvoiceStatus("new")
 	invoice, _ := lavatopaggregates.NewInvoice(
 		1,
+		userId,
 		"",
 		status,
 		email,
-		offerId,
+		offer,
 		lavatopvalueobjects.ONE_TIME,
 		lavatopvalueobjects.RUB,
 		lavatopvalueobjects.BANK131,
@@ -135,5 +143,207 @@ func TestCreateInvoice_404Response(t *testing.T) {
 	expectedErrorMessage := "unexpected status code: 404"
 	if !strings.Contains(err.Error(), expectedErrorMessage) {
 		t.Errorf("Unexpected error message: got %q, expected %q", err.Error(), expectedErrorMessage)
+	}
+}
+
+func TestGetInvoiceStatus(t *testing.T) {
+	mockResponse := dto.InvoicePaymentParamsResponse{
+		ID:     "f1f47a26-4795-420e-8dc1-2260dd065fbb",
+		Status: "in-progress",
+		AmountTotal: dto.AmountTotalDto{
+			Currency: "RUB",
+			Amount:   50,
+		},
+	}
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("Expected GET request, got %s", r.Method)
+		}
+
+		if r.Header.Get("X-Api-Key") == "" {
+			t.Fatal("Missing X-Api-Key header")
+		}
+
+		query := r.URL.Query()
+		if query.Get("id") != mockResponse.ID {
+			t.Fatalf("Expected ID %s, got %s", mockResponse.ID, query.Get("id"))
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(mockResponse)
+	}))
+	defer mockServer.Close()
+
+	service := LavaTopBillingService{
+		getInvoiceUrl: mockServer.URL,
+		apiKey:        "test-api-key",
+	}
+
+	status, err := service.GetInvoiceStatus("f1f47a26-4795-420e-8dc1-2260dd065fbb")
+	if err != nil {
+		t.Fatalf("GetInvoiceStatus returned error: %v", err)
+	}
+
+	expectedStatus := "in-progress"
+	if status != expectedStatus {
+		t.Errorf("Expected status %s, got %s", expectedStatus, status)
+	}
+}
+
+func TestGetInvoiceStatus_404Response(t *testing.T) {
+	mockErrorResponse := map[string]interface{}{
+		"error":     "{\"errors\":[\"Contract with id 'f1f47a26-4795-420e-8dc1-2260dd065f8b' does not exists\"]}",
+		"details":   map[string]interface{}{},
+		"timestamp": "2025-01-11T16:29:57.326842+02:00",
+	}
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("Expected GET request, got %s", r.Method)
+		}
+
+		if r.Header.Get("X-Api-Key") == "" {
+			t.Fatal("Missing X-Api-Key header")
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(mockErrorResponse)
+	}))
+	defer mockServer.Close()
+
+	service := LavaTopBillingService{
+		getInvoiceUrl: mockServer.URL,
+		apiKey:        "test-api-key",
+	}
+
+	_, err := service.GetInvoiceStatus("f1f47a26-4795-420e-8dc1-2260dd065f8b")
+	if err == nil {
+		t.Fatalf("Expected error, got nil")
+	}
+
+	expectedErrorMessage := "unexpected status code: 404"
+	if !strings.Contains(err.Error(), expectedErrorMessage) {
+		t.Errorf("Unexpected error message: got %q, expected %q", err.Error(), expectedErrorMessage)
+	}
+
+	expectedErrorDetails := "Contract with id 'f1f47a26-4795-420e-8dc1-2260dd065f8b' does not exists"
+	if !strings.Contains(err.Error(), expectedErrorDetails) {
+		t.Errorf("Error message should include details: got %q, expected to contain %q", err.Error(), expectedErrorDetails)
+	}
+}
+
+func TestGetOffers(t *testing.T) {
+	mockResponse := dto.GetOffersResponse{
+		Items: []dto.ProductResponse{
+			{
+				ID:    "c48a74d5-92f7-4671-b560-3d2635fc3f80",
+				Title: "1 Month Plan",
+				Offers: []dto.OfferResponse{
+					{
+						ID:   "6c0cf730-3432-4755-941b-ca23b419d6df",
+						Name: "1 Month Plan",
+						Prices: []dto.PriceDto{
+							{
+								Currency:    "EUR",
+								Amount:      0.48,
+								Periodicity: "ONE_TIME",
+							},
+							{
+								Currency:    "RUB",
+								Amount:      50,
+								Periodicity: "ONE_TIME",
+							},
+							{
+								Currency:    "USD",
+								Amount:      0.49,
+								Periodicity: "ONE_TIME",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("Expected GET request, got %s", r.Method)
+		}
+
+		if r.Header.Get("X-Api-Key") == "" {
+			t.Fatal("Missing X-Api-Key header")
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(mockResponse)
+	}))
+	defer mockServer.Close()
+
+	service := LavaTopBillingService{
+		getOffersUrl: mockServer.URL,
+		apiKey:       "test-api-key",
+	}
+
+	offers, err := service.GetOffers()
+	if err != nil {
+		t.Fatalf("GetOffers returned error: %v", err)
+	}
+
+	expectedOfferCount := 1
+	if len(offers) != expectedOfferCount {
+		t.Errorf("Expected %d offers, got %d", expectedOfferCount, len(offers))
+	}
+
+	eurPrice := lavatopvalueobjects.NewPrice(48, lavatopvalueobjects.EUR, lavatopvalueobjects.ONE_TIME)
+	rubPrice := lavatopvalueobjects.NewPrice(5000, lavatopvalueobjects.RUB, lavatopvalueobjects.ONE_TIME)
+	usdPrice := lavatopvalueobjects.NewPrice(49, lavatopvalueobjects.USD, lavatopvalueobjects.ONE_TIME)
+	prices := []lavatopvalueobjects.Price{eurPrice, rubPrice, usdPrice}
+
+	expectedOffer := lavatopvalueobjects.NewOffer(
+		"6c0cf730-3432-4755-941b-ca23b419d6df",
+		"1 Month Plan",
+		prices,
+	)
+
+	if offers[0].ExtId() != expectedOffer.ExtId() {
+		t.Errorf("Expected offer ID %s, got %s", expectedOffer.ExtId(), offers[0].ExtId())
+	}
+
+	if offers[0].Name() != expectedOffer.Name() {
+		t.Errorf("Expected offer name %s, got %s", expectedOffer.Name(), offers[0].Name())
+	}
+
+	if offers[0].Prices()[0].Cents() != expectedOffer.Prices()[0].Cents() {
+		t.Errorf("Expected price %d, got %d", expectedOffer.Prices()[0].Cents(), offers[0].Prices()[0].Cents())
+	}
+
+	if offers[0].Prices()[0].Currency() != expectedOffer.Prices()[0].Currency() {
+		t.Errorf("Expected currency %s, got %s", expectedOffer.Prices()[0].Currency(), offers[0].Prices()[0].Currency())
+	}
+
+	if offers[0].Prices()[0].Periodicity() != expectedOffer.Prices()[0].Periodicity() {
+		t.Errorf("Expected periodicity %s, got %s", expectedOffer.Prices()[0].Periodicity(), offers[0].Prices()[0].Periodicity())
+	}
+
+	expectedPrices := make(map[string]lavatopvalueobjects.Price)
+	for _, price := range expectedOffer.Prices() {
+		expectedPrices[price.Currency().String()] = price
+	}
+
+	for _, price := range offers[0].Prices() {
+		expectedPrice, exists := expectedPrices[price.Currency().String()]
+		if !exists {
+			t.Errorf("Expected price for currency %s, but it was not found", price.Currency().String())
+			continue
+		}
+
+		if expectedPrice.Cents() != price.Cents() {
+			t.Errorf("Expected %d cents for currency %s, got %d", price.Cents(), price.Currency().String(), expectedPrice.Cents())
+		}
+
+		if expectedPrice.Periodicity() != price.Periodicity() {
+			t.Errorf("Expected periodicity %s for currency %s, got %s", price.Periodicity(), price.Currency(), expectedPrice.Periodicity())
+		}
 	}
 }

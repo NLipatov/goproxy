@@ -7,10 +7,11 @@ import (
 
 type Invoice struct {
 	id            int
+	userId        int
 	extId         string
 	status        lavatopvalueobjects.Status
 	email         valueobjects.Email
-	offerId       valueobjects.Guid
+	offer         lavatopvalueobjects.Offer
 	periodicity   lavatopvalueobjects.Periodicity
 	currency      lavatopvalueobjects.Currency
 	paymentMethod lavatopvalueobjects.PaymentMethod
@@ -19,10 +20,11 @@ type Invoice struct {
 
 func NewInvoice(
 	id int,
+	userId int,
 	externalId string, // invoice identifier in lava top system
 	status lavatopvalueobjects.Status,
 	email valueobjects.Email,
-	offerId valueobjects.Guid,
+	offer lavatopvalueobjects.Offer,
 	periodicity lavatopvalueobjects.Periodicity,
 	currency lavatopvalueobjects.Currency,
 	paymentMethod lavatopvalueobjects.PaymentMethod,
@@ -30,10 +32,11 @@ func NewInvoice(
 
 	return Invoice{
 		id:            id,
+		userId:        userId,
 		extId:         externalId,
 		status:        status,
 		email:         email,
-		offerId:       offerId,
+		offer:         offer,
 		periodicity:   periodicity,
 		currency:      currency,
 		paymentMethod: paymentMethod,
@@ -43,6 +46,10 @@ func NewInvoice(
 
 func (i Invoice) Id() int {
 	return i.id
+}
+
+func (i Invoice) UserId() int {
+	return i.userId
 }
 
 func (i Invoice) ExtId() string {
@@ -57,8 +64,8 @@ func (i Invoice) Email() valueobjects.Email {
 	return i.email
 }
 
-func (i Invoice) OfferId() valueobjects.Guid {
-	return i.offerId
+func (i Invoice) Offer() lavatopvalueobjects.Offer {
+	return i.offer
 }
 
 func (i Invoice) Periodicity() lavatopvalueobjects.Periodicity {

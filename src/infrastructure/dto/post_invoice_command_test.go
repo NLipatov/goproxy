@@ -13,10 +13,16 @@ func TestToInvoiceDTO(t *testing.T) {
 		t.Fatal(emailErr)
 	}
 
-	offerId, offerIdErr := valueobjects.ParseGuidFromString("6c0cf730-3432-4755-941b-ca23b419d6df")
-	if offerIdErr != nil {
-		t.Fatal(offerIdErr)
-	}
+	eurPrice := lavatopvalueobjects.NewPrice(48, lavatopvalueobjects.EUR, lavatopvalueobjects.ONE_TIME)
+	rubPrice := lavatopvalueobjects.NewPrice(5000, lavatopvalueobjects.RUB, lavatopvalueobjects.ONE_TIME)
+	usdPrice := lavatopvalueobjects.NewPrice(49, lavatopvalueobjects.USD, lavatopvalueobjects.ONE_TIME)
+	prices := []lavatopvalueobjects.Price{eurPrice, rubPrice, usdPrice}
+
+	offer := lavatopvalueobjects.NewOffer(
+		"6c0cf730-3432-4755-941b-ca23b419d6df",
+		"1 Month Plan",
+		prices,
+	)
 
 	status, statusErr := lavatopvalueobjects.ParseInvoiceStatus("new")
 	if statusErr != nil {
@@ -25,10 +31,11 @@ func TestToInvoiceDTO(t *testing.T) {
 
 	invoice, invoiceErr := lavatopaggregates.NewInvoice(
 		1,
+		2,
 		"e624e74b-a109-4775-b8e2-be27ce89a0b8",
 		status,
 		email,
-		offerId,
+		offer,
 		lavatopvalueobjects.ONE_TIME,
 		lavatopvalueobjects.USD,
 		lavatopvalueobjects.STRIPE,
@@ -38,21 +45,22 @@ func TestToInvoiceDTO(t *testing.T) {
 		t.Fatal(invoiceErr)
 	}
 
+	expected := PostInvoiceCommand{
+		Email:         "example@example.com",
+		OfferId:       "6c0cf730-3432-4755-941b-ca23b419d6df",
+		Periodicity:   "ONE_TIME",
+		Currency:      "USD",
+		PaymentMethod: "STRIPE",
+		BuyerLanguage: "EN",
+	}
+
 	cmd, err := ToInvoiceDTO(invoice)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if cmd.Email != invoice.Email().String() {
-		t.Errorf("Email expected %s, got %s", invoice.Email().String(), cmd.Email)
-	}
-
-	if cmd.OfferId != invoice.OfferId().String() {
-		t.Errorf("OfferId expected %s, got %s", invoice.OfferId().String(), cmd.OfferId)
-	}
-
-	if cmd.Periodicity != invoice.Periodicity().String() {
-		t.Errorf("Periodicity expected %s, got %s", invoice.Periodicity().String(), cmd.Periodicity)
+	if cmd != expected {
+		t.Errorf("Unexpected result: got %+v, expected %+v", cmd, expected)
 	}
 
 	tests := []struct {

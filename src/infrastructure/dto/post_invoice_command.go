@@ -24,7 +24,7 @@ func ToInvoiceDTO(invoice lavatopaggregates.Invoice) (PostInvoiceCommand, error)
 
 	buyerLanguage := invoice.BuyerLanguage().String()
 
-	offerId := invoice.OfferId().String()
+	offerId := invoice.Offer().ExtId()
 
 	return PostInvoiceCommand{
 		Email:         email,
