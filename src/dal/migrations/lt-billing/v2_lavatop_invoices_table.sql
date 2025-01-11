@@ -3,7 +3,6 @@ CREATE TABLE invoices (
     ext_id UUID NOT NULL UNIQUE,
     user_id INT NOT NULL,
     offer_id UUID NOT NULL,
-    plan_id UUID NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'new' CHECK (
       status IN (
                  'new',
@@ -21,6 +20,5 @@ CREATE TABLE invoices (
 );
 
 CREATE INDEX idx_offer_id ON invoices (offer_id);
-CREATE INDEX idx_plan_id ON invoices (plan_id);
 CREATE INDEX idx_user_id_status ON invoices (user_id, status);
 CREATE INDEX idx_created_at ON invoices (created_at);
