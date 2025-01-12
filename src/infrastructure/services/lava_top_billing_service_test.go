@@ -285,16 +285,6 @@ func TestGetOffers(t *testing.T) {
 		apiKey:       "test-api-key",
 	}
 
-	offers, err := service.GetOffers()
-	if err != nil {
-		t.Fatalf("GetOffers returned error: %v", err)
-	}
-
-	expectedOfferCount := 1
-	if len(offers) != expectedOfferCount {
-		t.Errorf("Expected %d offers, got %d", expectedOfferCount, len(offers))
-	}
-
 	eurPrice := lavatopvalueobjects.NewPrice(48, lavatopvalueobjects.EUR, lavatopvalueobjects.ONE_TIME)
 	rubPrice := lavatopvalueobjects.NewPrice(5000, lavatopvalueobjects.RUB, lavatopvalueobjects.ONE_TIME)
 	usdPrice := lavatopvalueobjects.NewPrice(49, lavatopvalueobjects.USD, lavatopvalueobjects.ONE_TIME)
@@ -306,24 +296,36 @@ func TestGetOffers(t *testing.T) {
 		prices,
 	)
 
-	if offers[0].ExtId() != expectedOffer.ExtId() {
-		t.Errorf("Expected offer ID %s, got %s", expectedOffer.ExtId(), offers[0].ExtId())
+	offers, err := service.GetOffers()
+	if err != nil {
+		t.Fatalf("GetOffers returned error: %v", err)
 	}
 
-	if offers[0].Name() != expectedOffer.Name() {
-		t.Errorf("Expected offer name %s, got %s", expectedOffer.Name(), offers[0].Name())
+	expectedOfferCount := 1
+	if len(offers) != expectedOfferCount {
+		t.Errorf("Expected %d offers, got %d", expectedOfferCount, len(offers))
 	}
 
-	if offers[0].Prices()[0].Cents() != expectedOffer.Prices()[0].Cents() {
-		t.Errorf("Expected price %d, got %d", expectedOffer.Prices()[0].Cents(), offers[0].Prices()[0].Cents())
+	actualOffer := offers[0]
+
+	if actualOffer.ExtId() != expectedOffer.ExtId() {
+		t.Errorf("Expected offer ID %s, got %s", expectedOffer.ExtId(), actualOffer.ExtId())
 	}
 
-	if offers[0].Prices()[0].Currency() != expectedOffer.Prices()[0].Currency() {
-		t.Errorf("Expected currency %s, got %s", expectedOffer.Prices()[0].Currency(), offers[0].Prices()[0].Currency())
+	if actualOffer.Name() != expectedOffer.Name() {
+		t.Errorf("Expected offer name %s, got %s", expectedOffer.Name(), actualOffer.Name())
 	}
 
-	if offers[0].Prices()[0].Periodicity() != expectedOffer.Prices()[0].Periodicity() {
-		t.Errorf("Expected periodicity %s, got %s", expectedOffer.Prices()[0].Periodicity(), offers[0].Prices()[0].Periodicity())
+	if actualOffer.Prices()[0].Cents() != expectedOffer.Prices()[0].Cents() {
+		t.Errorf("Expected price %d, got %d", expectedOffer.Prices()[0].Cents(), actualOffer.Prices()[0].Cents())
+	}
+
+	if actualOffer.Prices()[0].Currency() != expectedOffer.Prices()[0].Currency() {
+		t.Errorf("Expected currency %s, got %s", expectedOffer.Prices()[0].Currency(), actualOffer.Prices()[0].Currency())
+	}
+
+	if actualOffer.Prices()[0].Periodicity() != expectedOffer.Prices()[0].Periodicity() {
+		t.Errorf("Expected periodicity %s, got %s", expectedOffer.Prices()[0].Periodicity(), actualOffer.Prices()[0].Periodicity())
 	}
 
 	expectedPrices := make(map[string]lavatopvalueobjects.Price)
