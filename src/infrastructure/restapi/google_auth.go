@@ -15,14 +15,14 @@ import (
 )
 
 func getPort() int {
-	portEnvValue := os.Getenv("SERVER_PORT")
+	portEnvValue := os.Getenv("SERVE_PORT")
 	if portEnvValue == "" {
-		log.Fatalf("SERVER_PORT environment variable is not set")
+		log.Fatalf("SERVE_PORT environment variable is not set")
 	}
 
 	port, err := strconv.Atoi(portEnvValue)
 	if err != nil {
-		log.Fatalf("SERVER_PORT environment variable is not a number")
+		log.Fatalf("SERVE_PORT environment variable is not a number")
 	}
 
 	return port
@@ -40,7 +40,7 @@ func getGoogleOauthConfig() *oauth2.Config {
 	}
 
 	return &oauth2.Config{
-		ClientID:     "141269271249-alja6vd382po8hkf3oqfip13rcoiot1o.apps.googleusercontent.com",
+		ClientID:     clientId,
 		ClientSecret: clientSecret,
 		RedirectURL:  fmt.Sprintf("http://localhost:%d/auth/callback", getPort()),
 		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email"},
