@@ -7,30 +7,56 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
-const port = 3030
+func getPort() int {
+	portEnvValue := os.Getenv("SERVER_PORT")
+	if portEnvValue == "" {
+		log.Fatalf("SERVER_PORT environment variable is not set")
+	}
 
-var googleOauthConfig = &oauth2.Config{
-	ClientID:     "141269271249-alja6vd382po8hkf3oqfip13rcoiot1o.apps.googleusercontent.com",
-	ClientSecret: "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",
-	RedirectURL:  fmt.Sprintf("http://localhost:%d/auth/callback", port),
-	Scopes:       []string{"https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email"},
-	Endpoint:     google.Endpoint,
+	port, err := strconv.Atoi(portEnvValue)
+	if err != nil {
+		log.Fatalf("SERVER_PORT environment variable is not a number")
+	}
+
+	return port
+}
+
+func getGoogleOauthConfig() *oauth2.Config {
+	clientSecret := os.Getenv("GOOGLE_AUTH_CLIENT_SECRET")
+	if clientSecret == "" {
+		log.Fatalf("GOOGLE_AUTH_CLIENT_SECRET environment variable is not set")
+	}
+
+	clientId := os.Getenv("GOOGLE_AUTH_CLIENT_ID")
+	if clientId == "" {
+		log.Fatalf("GOOGLE_AUTH_CLIENT_ID environment variable is not set")
+	}
+
+	return &oauth2.Config{
+		ClientID:     "141269271249-alja6vd382po8hkf3oqfip13rcoiot1o.apps.googleusercontent.com",
+		ClientSecret: clientSecret,
+		RedirectURL:  fmt.Sprintf("http://localhost:%d/auth/callback", getPort()),
+		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email"},
+		Endpoint:     google.Endpoint,
+	}
 }
 
 func HandleGoogleAuth() {
 	http.HandleFunc("/auth/login", handleGoogleLogin)
 	http.HandleFunc("/auth/callback", handleGoogleCallback)
-	log.Println(fmt.Sprintf("Server is running on http://localhost:%d", port))
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
+	log.Println(fmt.Sprintf("Server is running on http://localhost:%d", getPort()))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", getPort()), nil))
 }
 
 func handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
-	url := googleOauthConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	url := getGoogleOauthConfig().AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
@@ -41,13 +67,13 @@ func handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	code := r.URL.Query().Get("code")
-	token, err := googleOauthConfig.Exchange(context.Background(), code)
+	token, err := getGoogleOauthConfig().Exchange(context.Background(), code)
 	if err != nil {
 		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	client := googleOauthConfig.Client(context.Background(), token)
+	client := getGoogleOauthConfig().Client(context.Background(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
 		http.Error(w, "Failed to get user info: "+err.Error(), http.StatusInternalServerError)
