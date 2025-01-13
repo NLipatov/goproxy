@@ -110,7 +110,7 @@ func LoadRateLimiterConfig() RateLimiterConfig {
 	}
 
 	// Set MaxConns
-	config.MaxConns = config.MaxUsers * 10 // For example, 10 connections per user
+	config.MaxConns = config.MaxUsers * 25 // For example, 25 connections per user
 
 	// Optionally, allow overriding MaxConns via environment variables
 	maxConnsStr := os.Getenv("MAX_CONNS")
