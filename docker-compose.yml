@@ -119,6 +119,10 @@ services:
       - PROXY_KAFKA_GROUP_ID=traffic-processor
       - PROXY_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - PROXY_KAFKA_TOPIC=${PROXY_KAFKA_TOPIC}
+      - TC_CACHE_HOST=${TC_CACHE_HOST}
+      - TC_CACHE_PORT=${TC_CACHE_PORT}
+      - TC_CACHE_USER=${TC_CACHE_USER}
+      - TC_CACHE_PASSWORD=${TC_CACHE_PASSWORD}
     depends_on:
       init-kafka-topics:
           condition: service_completed_successfully
@@ -160,7 +164,7 @@ services:
       - "9092:9092"
       - "9093:9093"
     environment:
-      KAFKA_BROKER_ID: 1
+      KAFKA_BROKER_ID: -1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT

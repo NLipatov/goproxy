@@ -28,6 +28,8 @@ func main() {
 		startKafkaRelay()
 	case "plan-controller":
 		startPlanController()
+	case "google-auth":
+		restapi.HandleGoogleAuth()
 	default:
 		log.Fatalf("Unsupported mode: %s", mode)
 	}
