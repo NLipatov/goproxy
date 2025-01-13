@@ -119,6 +119,10 @@ services:
       - PROXY_KAFKA_GROUP_ID=traffic-processor
       - PROXY_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - PROXY_KAFKA_TOPIC=${PROXY_KAFKA_TOPIC}
+      - TC_CACHE_HOST=${TC_CACHE_HOST}
+      - TC_CACHE_PORT=${TC_CACHE_PORT}
+      - TC_CACHE_USER=${TC_CACHE_USER}
+      - TC_CACHE_PASSWORD=${TC_CACHE_PASSWORD}
     depends_on:
       init-kafka-topics:
           condition: service_completed_successfully
