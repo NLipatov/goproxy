@@ -22,7 +22,7 @@ func TestLoadRateLimiterConfig(t *testing.T) {
 				ShardCount:       runtime.NumCPU() * 2,
 				Capacity:         100 * 1024 * 1024,
 				FillRate:         1000 * 125000,
-				MaxConns:         100 * 10,
+				MaxConns:         25,
 				BlockDur:         30 * time.Second,
 				CleanupInt:       1 * time.Minute,
 			},
