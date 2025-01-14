@@ -49,6 +49,16 @@ func TestUserRepository(t *testing.T) {
 		assertUsersEqual(t, user, loadedUser)
 	})
 
+	t.Run("GetByEmail", func(t *testing.T) {
+		userId := insertTestUser(repo, t)
+		user, GetErr := repo.GetById(userId)
+		assertNoError(t, GetErr, "Failed to load user by Id")
+
+		loadedUser, loadedUserErr := repo.GetByEmail(user.Email())
+		assertNoError(t, loadedUserErr, "Failed to load user by ID")
+		assertUsersEqual(t, user, loadedUser)
+	})
+
 	t.Run("Insert", func(t *testing.T) {
 		userId := insertTestUser(repo, t)
 		user, userErr := repo.GetById(userId)
