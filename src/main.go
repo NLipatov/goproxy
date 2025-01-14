@@ -9,6 +9,7 @@ import (
 	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/dto"
 	"goproxy/infrastructure/restapi"
+	"goproxy/infrastructure/restapi/google_auth"
 	"goproxy/infrastructure/services"
 	"log"
 	"os"
@@ -29,10 +30,34 @@ func main() {
 	case "plan-controller":
 		startPlanController()
 	case "google-auth":
-		restapi.HandleGoogleAuth()
+		startGoogleAuthController()
 	default:
 		log.Fatalf("Unsupported mode: %s", mode)
 	}
+}
+
+func startGoogleAuthController() {
+	oauthConfig := config.NewGoogleOauthConfig()
+	db, err := dal.ConnectDB()
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cache, err := repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	userRepository := repositories.NewUserRepository(db, cache)
+	cryptoService := services.NewCryptoService(32)
+	userUseCases := application.NewUserUseCases(userRepository, cryptoService)
+	authService := google_auth.NewGoogleAuthService(userUseCases, cryptoService)
+	controller := google_auth.NewGoogleAuthController(authService)
+
+	controller.Listen(oauthConfig.Port)
 }
 
 func startPlanController() {

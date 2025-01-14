@@ -31,6 +31,10 @@ func (u UserUseCases) GetById(id int) (aggregates.User, error) {
 	return u.repo.GetById(id)
 }
 
+func (u UserUseCases) GetByEmail(email string) (aggregates.User, error) {
+	return u.repo.GetByEmail(email)
+}
+
 func (u UserUseCases) Create(command commands.PostUser) (int, error) {
 	salt, err := u.cryptoService.GenerateSalt()
 	if err != nil {

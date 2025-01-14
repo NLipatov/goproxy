@@ -1,0 +1,312 @@
+package google_auth
+
+import (
+	"context"
+	"crypto/rsa"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/golang-jwt/jwt/v4"
+	"goproxy/application"
+	"goproxy/application/commands"
+	"goproxy/domain/valueobjects"
+	"goproxy/infrastructure/config"
+	"goproxy/infrastructure/restapi"
+	"goproxy/infrastructure/services"
+	"io"
+	"log"
+	"math/big"
+	"net/http"
+	"strings"
+	"time"
+
+	"golang.org/x/oauth2"
+)
+
+type authData struct {
+	idToken string
+}
+
+type GoogleAuthService struct {
+	userUseCases        application.UserUseCases
+	cryptoService       application.CryptoService
+	cookieBuilder       restapi.CookieBuilder
+	cache               application.CacheWithTTL[authData]
+	oauthConfigProvider config.GoogleOauthConfigProvider
+}
+
+func NewGoogleAuthService(userUseCases application.UserUseCases, cryptoService application.CryptoService) *GoogleAuthService {
+	cache, cacheErr := services.NewRedisCache[authData]()
+	if cacheErr != nil {
+		log.Fatalf("failed to create cache instance: %s", cacheErr)
+	}
+
+	return &GoogleAuthService{
+		userUseCases:        userUseCases,
+		cryptoService:       cryptoService,
+		cookieBuilder:       restapi.NewCookieBuilder(),
+		cache:               cache,
+		oauthConfigProvider: config.NewGoogleOauthConfig(),
+	}
+}
+
+func (g *GoogleAuthService) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
+	stateToken, stateTokenErr := g.cryptoService.GenerateRandomString(32)
+	if stateTokenErr != nil {
+		log.Printf("Failed to generate random string: %s", stateTokenErr)
+		http.Error(w, "server failed generate stateToken id", http.StatusInternalServerError)
+		return
+	}
+
+	err := g.cache.Set(stateToken, authData{})
+	if err != nil {
+		log.Printf("Failed to save state in cache: %s", err)
+		http.Error(w, "server failed to save state token", http.StatusInternalServerError)
+		return
+	}
+	_ = g.cache.Expire(stateToken, time.Minute*5)
+
+	url := g.oauthConfigProvider.Config.AuthCodeURL(stateToken, oauth2.AccessTypeOnline)
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+func (g *GoogleAuthService) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
+	state := r.URL.Query().Get("state")
+	if _, err := g.cache.Get(state); err != nil {
+		log.Printf("Invalid or expired state: %s", err)
+		http.Error(w, "Invalid or expired state", http.StatusUnauthorized)
+		return
+	}
+
+	if err := g.cache.Expire(state, time.Nanosecond); err != nil {
+		log.Printf("Failed to delete state from cache: %s", err)
+	}
+
+	code := r.URL.Query().Get("code")
+	token, err := g.oauthConfigProvider.Config.Exchange(context.Background(), code)
+	if err != nil {
+		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, g.cookieBuilder.BuildCookie("/", "state-token-id", "", time.Nanosecond))
+
+	client := g.oauthConfigProvider.Config.Client(context.Background(), token)
+
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	if err != nil {
+		http.Error(w, "Failed to get user info: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	userInfo := struct {
+		Email         string `json:"email"`
+		Name          string `json:"name"`
+		Picture       string `json:"picture"`
+		VerifiedEmail bool   `json:"verified_email"`
+	}{}
+
+	userInfoErr := json.NewDecoder(resp.Body).Decode(&userInfo)
+	if userInfoErr != nil {
+		http.Error(w, fmt.Sprintf("Failed to parse user info: %s", err), http.StatusInternalServerError)
+		return
+	}
+
+	proxyPassword := ""
+	_, userErr := g.userUseCases.GetByEmail(userInfo.Email)
+	if userErr != nil {
+		if strings.Contains(userErr.Error(), "user not found") {
+			newProxyPassword, createUserErr := g.createNewUser(userInfo.Name, userInfo.Email)
+			if createUserErr != nil {
+				log.Printf("Failed to create new user: %s", createUserErr.Error())
+				http.Error(w, "failed to generate new user", http.StatusInternalServerError)
+				return
+			}
+
+			proxyPassword = newProxyPassword
+		} else {
+			log.Printf("Failed to fetch user: %s", userErr)
+			http.Error(w, "failed to fetch user", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	idToken, ok := token.Extra("id_token").(string)
+	if !ok {
+		http.Error(w, "No ID token found", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, g.cookieBuilder.BuildCookie("/", "id_token", idToken, time.Hour))
+	http.SetCookie(w, g.cookieBuilder.BuildCookie("/", "new_proxy_password", proxyPassword, time.Hour))
+	http.Redirect(w, r, "http://localhost:5173/dashboard", http.StatusTemporaryRedirect)
+}
+
+type googleCerts struct {
+	Keys []struct {
+		Kid string `json:"kid"`
+		N   string `json:"n"`
+		E   string `json:"e"`
+	} `json:"keys"`
+}
+
+func fetchGoogleCerts() (*googleCerts, error) {
+	resp, err := http.Get("https://www.googleapis.com/oauth2/v3/certs")
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch Google certs: %v", err)
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	body, bodyErr := io.ReadAll(resp.Body)
+	if bodyErr != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	var certs googleCerts
+	unmarshalErr := json.Unmarshal(body, &certs)
+	if unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to parse certs: %v", err)
+	}
+
+	return &certs, nil
+}
+
+func getPublicKey(certs *googleCerts, kid string) (*rsa.PublicKey, error) {
+	for _, key := range certs.Keys {
+		if key.Kid == kid {
+			n, err := base64.RawURLEncoding.DecodeString(key.N)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode key N: %v", err)
+			}
+
+			e, err := base64.RawURLEncoding.DecodeString(key.E)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode key E: %v", err)
+			}
+
+			pubKey := &rsa.PublicKey{
+				N: new(big.Int).SetBytes(n),
+				E: int(new(big.Int).SetBytes(e).Uint64()),
+			}
+			return pubKey, nil
+		}
+	}
+	return nil, errors.New("no matching public key found")
+}
+
+func verifyIDToken(idToken string) (*jwt.Token, error) {
+	certs, err := fetchGoogleCerts()
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := jwt.Parse(idToken, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+
+		kid, ok := t.Header["kid"].(string)
+		if !ok {
+			return nil, errors.New("missing kid in token header")
+		}
+
+		return getPublicKey(certs, kid)
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify ID token: %v", err)
+	}
+
+	return token, nil
+}
+
+func (g *GoogleAuthService) createNewUser(name, email string) (proxyPassword string, err error) {
+	randomString, randomStringErr := g.cryptoService.GenerateRandomString(32)
+	if randomStringErr != nil {
+		return "", fmt.Errorf("failed to register user - failed to generate password: %s", randomStringErr)
+	}
+
+	password, passwordErr := valueobjects.NewPasswordFromString(randomString)
+	if passwordErr != nil {
+		return "", fmt.Errorf("failed to register user - failed to create password: %s", passwordErr)
+	}
+
+	postUserCommand := commands.PostUser{
+		Username: name,
+		Password: password,
+		Email:    email,
+	}
+	_, createErr := g.userUseCases.Create(postUserCommand)
+	if createErr != nil {
+		return "", fmt.Errorf("failed to register user - failed to create user: %s", createErr)
+	}
+
+	return password.Value, nil
+}
+
+func (g *GoogleAuthService) CheckAuthStatus(w http.ResponseWriter, r *http.Request) {
+	idToken, err := getIdTokenFromCookie(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	_, err = verifyIDToken(idToken)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	response := map[string]bool{"authenticated": true}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(response)
+}
+
+func getIdTokenFromCookie(r *http.Request) (string, error) {
+	cookie, err := r.Cookie("id_token")
+	if err != nil || cookie.Value == "" {
+		return "", errors.New("id_token not found in cookies")
+	}
+	return cookie.Value, nil
+}
+
+func (g *GoogleAuthService) GetUserInfo(w http.ResponseWriter, r *http.Request) {
+	idToken, err := getIdTokenFromCookie(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	verifiedToken, err := verifyIDToken(idToken)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	claims, ok := verifiedToken.Claims.(jwt.MapClaims)
+	if !ok {
+		http.Error(w, "Failed to parse token claims", http.StatusInternalServerError)
+		return
+	}
+
+	name, _ := claims["name"].(string)
+	picture, _ := claims["picture"].(string)
+
+	if name == "" || picture == "" {
+		http.Error(w, "Invalid token data", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]string{
+		"name":    name,
+		"picture": picture,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(response)
+}
