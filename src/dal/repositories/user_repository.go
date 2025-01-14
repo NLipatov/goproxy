@@ -27,11 +27,12 @@ func (u *UserRepository) GetByUsername(username string) (aggregates.User, error)
 
 	var id int
 	var usernameResult string
+	var emailResult string
 	var passwordHash, salt []byte
 
 	err = u.db.
-		QueryRow("SELECT id, username, password_hash, password_salt FROM public.users WHERE username = $1", username).
-		Scan(&id, &usernameResult, &passwordHash, &salt)
+		QueryRow("SELECT id, username, email, password_hash, password_salt FROM public.users WHERE username = $1", username).
+		Scan(&id, &usernameResult, &emailResult, &passwordHash, &salt)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -40,9 +41,9 @@ func (u *UserRepository) GetByUsername(username string) (aggregates.User, error)
 		return aggregates.User{}, fmt.Errorf("could not load user: %v", err)
 	}
 
-	user, userErr := aggregates.NewUser(id, username, passwordHash, salt)
+	user, userErr := aggregates.NewUser(id, usernameResult, emailResult, passwordHash, salt)
 	if userErr != nil {
-		return aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
+		return aggregates.User{}, fmt.Errorf("invalid user %d stored in db: %v", id, userErr)
 	}
 
 	_ = u.cache.Set(username, user)
@@ -52,11 +53,12 @@ func (u *UserRepository) GetByUsername(username string) (aggregates.User, error)
 
 func (u *UserRepository) GetById(id int) (aggregates.User, error) {
 	var username string
+	var email string
 	var passwordHash, salt []byte
 
 	err := u.db.
-		QueryRow("SELECT id, username, password_hash, password_salt FROM public.users WHERE id = $1", id).
-		Scan(&id, &username, &passwordHash, &salt)
+		QueryRow("SELECT id, username, email, password_hash, password_salt FROM public.users WHERE id = $1", id).
+		Scan(&id, &username, &email, &passwordHash, &salt)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -65,7 +67,32 @@ func (u *UserRepository) GetById(id int) (aggregates.User, error) {
 		return aggregates.User{}, fmt.Errorf("could not load user: %v", err)
 	}
 
-	user, userErr := aggregates.NewUser(id, username, passwordHash, salt)
+	user, userErr := aggregates.NewUser(id, username, email, passwordHash, salt)
+	if userErr != nil {
+		return aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
+	}
+
+	return user, nil
+}
+
+func (u *UserRepository) GetByEmail(email string) (aggregates.User, error) {
+	var id int
+	var usernameResult string
+	var emailResult string
+	var passwordHash, salt []byte
+
+	err := u.db.
+		QueryRow("SELECT id, username, email, password_hash, password_salt FROM public.users WHERE email = $1", email).
+		Scan(&id, &usernameResult, &emailResult, &passwordHash, &salt)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return aggregates.User{}, fmt.Errorf("user not found: %v", err)
+		}
+		return aggregates.User{}, fmt.Errorf("could not load user: %v", err)
+	}
+
+	user, userErr := aggregates.NewUser(id, usernameResult, emailResult, passwordHash, salt)
 	if userErr != nil {
 		return aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
 	}
@@ -75,8 +102,8 @@ func (u *UserRepository) GetById(id int) (aggregates.User, error) {
 
 func (u *UserRepository) Create(user aggregates.User) (int, error) {
 	var id int
-	err := u.db.QueryRow("INSERT INTO public.users (username, password_hash, password_salt) VALUES ($1, $2, $3) RETURNING id",
-		user.Username(), user.PasswordHash(), user.PasswordSalt(),
+	err := u.db.QueryRow("INSERT INTO public.users (username, email, password_hash, password_salt) VALUES ($1, $2, $3, $4) RETURNING id",
+		user.Username(), user.Email(), user.PasswordHash(), user.PasswordSalt(),
 	).Scan(&id)
 	return id, err
 }

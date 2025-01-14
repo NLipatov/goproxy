@@ -5,14 +5,20 @@ import "goproxy/domain/valueobjects"
 type User struct {
 	id           int
 	username     valueobjects.Username
+	email        valueobjects.Email
 	passwordHash valueobjects.Hash
 	passwordSalt valueobjects.Salt
 }
 
-func NewUser(id int, username string, hash, salt []byte) (User, error) {
-	usernameObject, usernameErr := valueobjects.NewUsernameFromString(username)
-	if usernameErr != nil {
-		return User{}, usernameErr
+func NewUser(id int, username string, email string, hash, salt []byte) (User, error) {
+	usernameObject, usernameObjectErr := valueobjects.NewUsernameFromString(username)
+	if usernameObjectErr != nil {
+		return User{}, usernameObjectErr
+	}
+
+	emailObject, emailObjectErr := valueobjects.ParseEmailFromString(email)
+	if emailObjectErr != nil {
+		return User{}, emailObjectErr
 	}
 
 	passwordHashObject, hashErr := valueobjects.NewHash(hash)
@@ -28,6 +34,7 @@ func NewUser(id int, username string, hash, salt []byte) (User, error) {
 	return User{
 		id:           id,
 		username:     usernameObject,
+		email:        emailObject,
 		passwordHash: passwordHashObject,
 		passwordSalt: saltObject,
 	}, nil
@@ -39,6 +46,10 @@ func (u *User) Id() int {
 
 func (u *User) Username() string {
 	return u.username.Value
+}
+
+func (u *User) Email() string {
+	return u.email.String()
 }
 
 func (u *User) PasswordSalt() []byte {

@@ -100,7 +100,8 @@ func TestAuthorizeBasic_Success(t *testing.T) {
 	}
 	cache := newMockCache()
 
-	user, userErr := aggregates.NewUser(1, "username", []byte("hashedPassword"), []byte("salt"))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	user, userErr := aggregates.NewUser(1, username, fmt.Sprintf("%s@example.com", username), []byte("hashedPassword"), []byte("salt"))
 	if userErr != nil {
 		t.Fatal(userErr)
 	}
@@ -132,7 +133,8 @@ func TestAuthorizeBasic_InvalidCredentials(t *testing.T) {
 	}
 	cache := newMockCache()
 
-	user, userErr := aggregates.NewUser(1, "username", []byte("hashedPassword"), []byte("salt"))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	user, userErr := aggregates.NewUser(1, username, fmt.Sprintf("%s@example.com", username), []byte("hashedPassword"), []byte("salt"))
 	if userErr != nil {
 		t.Fatal(userErr)
 	}
@@ -164,7 +166,8 @@ func TestAuthorizeBasic_CacheUsage(t *testing.T) {
 	}
 	cache := newMockCache()
 
-	user, userErr := aggregates.NewUser(1, "username", []byte("hashedPassword"), []byte("salt"))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	user, userErr := aggregates.NewUser(1, username, fmt.Sprintf("%s@example.com", username), []byte("hashedPassword"), []byte("salt"))
 	if userErr != nil {
 		t.Fatal(userErr)
 	}
@@ -206,7 +209,8 @@ func TestAuthorizeBasic_CacheExpiry(t *testing.T) {
 	}
 	cache := newMockCache()
 
-	user, userErr := aggregates.NewUser(1, "username", []byte("hashedPassword"), []byte("salt"))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	user, userErr := aggregates.NewUser(1, username, fmt.Sprintf("%s@example.com", username), []byte("hashedPassword"), []byte("salt"))
 	if userErr != nil {
 		t.Fatal(userErr)
 	}
@@ -253,7 +257,8 @@ func TestAuthorizeBasic_MinTTL(t *testing.T) {
 	}
 	cache := newMockCache()
 
-	user, userErr := aggregates.NewUser(1, "username", []byte("hashedPassword"), []byte("salt"))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	user, userErr := aggregates.NewUser(1, username, fmt.Sprintf("%s@example.com", username), []byte("hashedPassword"), []byte("salt"))
 	if userErr != nil {
 		t.Fatal(userErr)
 	}
@@ -305,7 +310,8 @@ func TestAuthorizeBasic_CacheError(t *testing.T) {
 		ttl:  make(map[string]time.Time),
 	}
 
-	user, _ := aggregates.NewUser(1, "username", []byte("hashedPassword"), []byte("salt"))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	user, _ := aggregates.NewUser(1, username, fmt.Sprintf("%s@example.com", username), []byte("hashedPassword"), []byte("salt"))
 
 	authService := AuthService{
 		cryptoService:    cryptoService,

@@ -42,7 +42,7 @@ func (u UserUseCases) Create(command commands.PostUser) (int, error) {
 		return 0, err
 	}
 
-	user, err := aggregates.NewUser(-1, command.Username, hash, salt)
+	user, err := aggregates.NewUser(-1, command.Username, command.Email, hash, salt)
 	if err != nil {
 		return 0, err
 	}

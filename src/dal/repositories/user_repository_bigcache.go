@@ -16,6 +16,7 @@ type BigCacheUserRepositoryCache struct {
 type StoredUser struct {
 	Id           int    `msgpack:"Id"`
 	Username     string `msgpack:"Username"`
+	Email        string `msgpack:"Email"`
 	PasswordHash []byte `msgpack:"PasswordHash"`
 	PasswordSalt []byte `msgpack:"PasswordSalt"`
 }
@@ -24,13 +25,14 @@ func ToStoredUser(user aggregates.User) (StoredUser, error) {
 	return StoredUser{
 		Id:           user.Id(),
 		Username:     user.Username(),
+		Email:        user.Email(),
 		PasswordHash: user.PasswordHash(),
 		PasswordSalt: user.PasswordSalt(),
 	}, nil
 }
 
 func FromStoredUser(user StoredUser) (aggregates.User, error) {
-	return aggregates.NewUser(user.Id, user.Username, user.PasswordHash, user.PasswordSalt)
+	return aggregates.NewUser(user.Id, user.Username, user.Email, user.PasswordHash, user.PasswordSalt)
 }
 
 func NewBigCacheUserRepositoryCache(ttl time.Duration, cleanInterval time.Duration, shards int, maxEntrySizeBytes int) (BigCacheUserRepositoryCache, error) {
