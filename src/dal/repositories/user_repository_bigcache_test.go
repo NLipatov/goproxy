@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"goproxy/domain/aggregates"
 	"testing"
@@ -17,14 +18,15 @@ func TestSetAndGet(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = cache.Dispose() }()
 
-	key := "user123"
-	user, err := aggregates.NewUser(1, "john_doe", make([]byte, 32), make([]byte, 32))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	email := fmt.Sprintf("%s@example.com", username)
+	user, err := aggregates.NewUser(1, username, email, make([]byte, 32), make([]byte, 32))
 	assert.NoError(t, err)
 
-	err = cache.Set(key, user)
+	err = cache.Set(username, user)
 	assert.NoError(t, err)
 
-	fetchedUser, err := cache.Get(key)
+	fetchedUser, err := cache.Get(username)
 	assert.NoError(t, err)
 	assert.Equal(t, user, fetchedUser)
 }
@@ -42,7 +44,7 @@ func TestTTLExpiration(t *testing.T) {
 	}(cache)
 
 	key := "expired_user"
-	user, err := aggregates.NewUser(2, "mark_doe", make([]byte, 32), make([]byte, 32))
+	user, err := aggregates.NewUser(2, "mark_doe", "example@example.com", make([]byte, 32), make([]byte, 32))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +74,7 @@ func TestUpdateAndFetch(t *testing.T) {
 		_ = cache.Dispose()
 	}(cache)
 
-	user, err := aggregates.NewUser(3, "alex_doe", make([]byte, 32), make([]byte, 32))
+	user, err := aggregates.NewUser(3, "alex_doe", "example@example.com", make([]byte, 32), make([]byte, 32))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +83,7 @@ func TestUpdateAndFetch(t *testing.T) {
 	err = cache.Set(key, user)
 	assert.NoError(t, err)
 
-	updatedUser, err := aggregates.NewUser(3, "seth_doe", make([]byte, 32), make([]byte, 32))
+	updatedUser, err := aggregates.NewUser(3, "seth_doe", "example@example.com", make([]byte, 32), make([]byte, 32))
 	if err != nil {
 		t.Fatal(err)
 	}

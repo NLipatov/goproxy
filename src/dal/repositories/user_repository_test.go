@@ -41,38 +41,46 @@ func TestUserRepository(t *testing.T) {
 
 	t.Run("GetById", func(t *testing.T) {
 		userId := insertTestUser(repo, t)
-		user, err := repo.GetById(userId)
-		assertNoError(t, err, "Failed to load user by Id")
-		loadedUser, err := repo.GetById(user.Id())
-		assertNoError(t, err, "Failed to load user by ID")
+		user, GetErr := repo.GetById(userId)
+		assertNoError(t, GetErr, "Failed to load user by Id")
+
+		loadedUser, loadedUserErr := repo.GetById(user.Id())
+		assertNoError(t, loadedUserErr, "Failed to load user by ID")
 		assertUsersEqual(t, user, loadedUser)
 	})
 
 	t.Run("Insert", func(t *testing.T) {
 		userId := insertTestUser(repo, t)
-		user, err := repo.GetById(userId)
-		assertNoError(t, err, "Failed to load user by Id")
-		loadedUser, err := repo.GetByUsername(user.Username())
-		assertNoError(t, err, "Failed to load inserted user")
+		user, userErr := repo.GetById(userId)
+		assertNoError(t, userErr, "Failed to load user by Id")
+
+		loadedUser, loadedUserErr := repo.GetByUsername(user.Username())
+		assertNoError(t, loadedUserErr, "Failed to load inserted user")
 		assertUsersEqual(t, user, loadedUser)
 	})
 
 	t.Run("Update", func(t *testing.T) {
 		userId := insertTestUser(repo, t)
-		user, err := repo.GetById(userId)
-		assertNoError(t, err, "Failed to load user by Id")
-		updatedUser, _ := aggregates.NewUser(userId, "updated_user", []byte("new_hash"), []byte("new_salt"))
+		user, userErr := repo.GetById(userId)
+		assertNoError(t, userErr, "Failed to load user by Id")
+
+		updatedUser, updatedUserErr := aggregates.NewUser(userId, "updated_user", "updated@example.com", []byte("new_hash"), []byte("new_salt"))
+		if updatedUserErr != nil {
+			t.Fatal(updatedUserErr)
+		}
 		assertNoError(t, repo.Update(updatedUser), "Failed to update user")
-		loadedUser, err := repo.GetById(user.Id())
-		assertNoError(t, err, "Failed to load updated user")
+
+		loadedUser, loadedUserErr := repo.GetById(user.Id())
+		assertNoError(t, loadedUserErr, "Failed to load updated user")
 		assertUsersNotEqual(t, user, loadedUser)
 	})
 }
 
 func insertTestUser(repo *UserRepository, t *testing.T) int {
 	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
-	user, err := aggregates.NewUser(-1, username, []byte("hashed_password"), []byte("salt"))
-	assertNoError(t, err, "Failed to create test user lavatopaggregates")
+	email := fmt.Sprintf("%s@example.com", username)
+	user, err := aggregates.NewUser(-1, username, email, []byte("hashed_password"), []byte("salt"))
+	assertNoError(t, err, "Failed to create test user")
 	id, err := repo.Create(user)
 	assertNoError(t, err, "Failed to insert test user")
 	return id
