@@ -56,6 +56,7 @@ func startGoogleAuthController() {
 	if kafkaConfErr != nil {
 		log.Fatal(kafkaConfErr)
 	}
+	kafkaConf.GroupID = "google-auth"
 
 	messageBusService, err := services.NewKafkaService(kafkaConf)
 	if err != nil {
@@ -164,6 +165,7 @@ func startHttpProxy() {
 	if kafkaConfigErr != nil {
 		log.Fatal(kafkaConfigErr)
 	}
+	kafkaConfig.GroupID = "proxy"
 
 	kafkaService, kafkaServiceErr := services.NewKafkaService(kafkaConfig)
 	if kafkaServiceErr != nil {

@@ -47,7 +47,7 @@ func (u *UserRepository) processEvents() {
 		_ = messageBus.Close()
 	}(u.messageBus)
 
-	topics := []string{fmt.Sprintf("%s", domain.AUTH)}
+	topics := []string{fmt.Sprintf("%s", domain.PROXY)}
 	err := u.messageBus.Subscribe(topics)
 	if err != nil {
 		log.Fatalf("Failed to subscribe to topics: %s", err)

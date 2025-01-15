@@ -422,7 +422,7 @@ func (g *GoogleAuthService) ProduceUserChangePasswordEvent(username string) {
 		log.Printf("failed to produce user changed password event - failed to create outbox event: %s", outboxEventErr)
 	}
 
-	produceErr := g.messageBus.Produce(fmt.Sprintf("%s", domain.AUTH), outboxEvent)
+	produceErr := g.messageBus.Produce(fmt.Sprintf("%s", domain.PROXY), outboxEvent)
 	if produceErr != nil {
 		log.Printf("failed to reset password - failed to produce event: %s", produceErr)
 	}

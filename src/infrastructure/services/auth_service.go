@@ -83,7 +83,7 @@ func (a *AuthService) processEvents() {
 		_ = messageBus.Close()
 	}(a.messageBus)
 
-	topics := []string{fmt.Sprintf("%s", domain.AUTH)}
+	topics := []string{fmt.Sprintf("%s", domain.PROXY)}
 	err := a.messageBus.Subscribe(topics)
 	if err != nil {
 		log.Fatalf("Failed to subscribe to topics: %s", err)
