@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"goproxy/domain"
 	"goproxy/infrastructure/config"
 	"os"
 	"testing"
@@ -35,7 +36,7 @@ func TestNewKafkaConfig_Success(t *testing.T) {
 		}
 	}()
 
-	context := config.BoundedContext("PROXY")
+	context := domain.BoundedContexts("PROXY")
 	kafkaConfig, err := config.NewKafkaConfig(context)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -60,7 +61,7 @@ func TestNewKafkaConfig_MissingEnvVar(t *testing.T) {
 		t.Fatalf("failed to unset environment variable: %v", err)
 	}
 
-	context := config.BoundedContext("PROXY")
+	context := domain.PROXY
 	_, err := config.NewKafkaConfig(context)
 	if err == nil {
 		t.Fatalf("expected an error, got nil")
@@ -73,7 +74,7 @@ func TestNewKafkaConfig_MissingEnvVar(t *testing.T) {
 }
 
 func TestNewKafkaConfig_UnsetContext(t *testing.T) {
-	context := config.BoundedContext("UNSET")
+	context := domain.UNSET
 	_, err := config.NewKafkaConfig(context)
 	if err == nil {
 		t.Fatalf("expected an error, got nil")

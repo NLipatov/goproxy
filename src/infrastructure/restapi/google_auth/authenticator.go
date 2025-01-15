@@ -10,7 +10,9 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"goproxy/application"
 	"goproxy/application/commands"
+	"goproxy/domain"
 	"goproxy/domain/aggregates"
+	"goproxy/domain/events"
 	"goproxy/domain/valueobjects"
 	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/restapi"
@@ -35,9 +37,10 @@ type GoogleAuthService struct {
 	cookieBuilder       restapi.CookieBuilder
 	cache               application.CacheWithTTL[authData]
 	oauthConfigProvider config.GoogleOauthConfigProvider
+	messageBus          application.MessageBusService
 }
 
-func NewGoogleAuthService(userUseCases application.UserUseCases, cryptoService application.CryptoService) *GoogleAuthService {
+func NewGoogleAuthService(userUseCases application.UserUseCases, cryptoService application.CryptoService, messageBus application.MessageBusService) *GoogleAuthService {
 	cache, cacheErr := services.NewRedisCache[authData]()
 	if cacheErr != nil {
 		log.Fatalf("failed to create cache instance: %s", cacheErr)
@@ -49,6 +52,7 @@ func NewGoogleAuthService(userUseCases application.UserUseCases, cryptoService a
 		cookieBuilder:       restapi.NewCookieBuilder(),
 		cache:               cache,
 		oauthConfigProvider: config.NewGoogleOauthConfig(),
+		messageBus:          messageBus,
 	}
 }
 
@@ -374,6 +378,8 @@ func (g *GoogleAuthService) ResetPassword(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	g.ProduceUserChangePasswordEvent(user.Username())
+
 	updatedBasicCredentials := BasicCredentials{
 		Username: user.Username(),
 		Password: password.Value,
@@ -399,4 +405,25 @@ func (g *GoogleAuthService) createPassword(length int) (valueobjects.Password, e
 	}
 
 	return password, nil
+}
+
+func (g *GoogleAuthService) ProduceUserChangePasswordEvent(username string) {
+	userPasswordChangedEvent := events.UserPasswordChangedEvent{
+		Username: username,
+	}
+
+	serializedEvent, serializationErr := json.Marshal(userPasswordChangedEvent)
+	if serializationErr != nil {
+		log.Printf("failed to produce user changed password event - failed to serialize event: %s", serializationErr)
+	}
+
+	outboxEvent, outboxEventErr := events.NewOutboxEvent(-1, string(serializedEvent), false, "UserPasswordChangedEvent")
+	if outboxEventErr != nil {
+		log.Printf("failed to produce user changed password event - failed to create outbox event: %s", outboxEventErr)
+	}
+
+	produceErr := g.messageBus.Produce(fmt.Sprintf("%s", domain.AUTH), outboxEvent)
+	if produceErr != nil {
+		log.Printf("failed to reset password - failed to produce event: %s", produceErr)
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
+	"goproxy/dal/repositories/mocks"
 	"goproxy/domain/aggregates"
 	"os"
 	"testing"
@@ -29,7 +30,7 @@ func TestUserRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	repo := NewUserRepository(db, cache)
+	repo := NewUserRepository(db, cache, mocks.NewMockMessageBusService())
 
 	t.Run("GetByUsername", func(t *testing.T) {
 		userId := insertTestUser(repo, t)

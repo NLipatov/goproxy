@@ -2,20 +2,84 @@ package repositories
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"goproxy/application"
+	"goproxy/domain"
 	"goproxy/domain/aggregates"
+	"goproxy/domain/events"
+	"goproxy/infrastructure/config"
+	"log"
+	"strings"
+	"sync"
 )
 
 type UserRepository struct {
-	db    *sql.DB
-	cache BigCacheUserRepositoryCache
+	db          *sql.DB
+	cache       BigCacheUserRepositoryCache
+	kafkaConfig config.KafkaConfig
+	messageBus  application.MessageBusService
+	once        sync.Once
 }
 
-func NewUserRepository(db *sql.DB, cache BigCacheUserRepositoryCache) *UserRepository {
-	return &UserRepository{
-		db:    db,
-		cache: cache,
+func NewUserRepository(db *sql.DB, cache BigCacheUserRepositoryCache, messageBusService application.MessageBusService) *UserRepository {
+	service := &UserRepository{
+		db:         db,
+		cache:      cache,
+		messageBus: messageBusService,
+	}
+
+	service.startProcessingEvents()
+
+	return service
+}
+
+func (u *UserRepository) startProcessingEvents() {
+	u.once.Do(func() {
+
+		go u.processEvents()
+	})
+}
+
+func (u *UserRepository) processEvents() {
+	defer func(messageBus application.MessageBusService) {
+		_ = messageBus.Close()
+	}(u.messageBus)
+
+	topics := []string{fmt.Sprintf("%s", domain.AUTH)}
+	err := u.messageBus.Subscribe(topics)
+	if err != nil {
+		log.Fatalf("Failed to subscribe to topics: %s", err)
+	}
+
+	log.Printf("Subscribed to topics: %s", strings.Join(topics, ", "))
+
+	for {
+		event, consumeErr := u.messageBus.Consume()
+		if consumeErr != nil {
+			log.Printf("failed to consume from message bus: %s", consumeErr)
+		}
+
+		if event == nil {
+			log.Printf("received nil event from message bus")
+			continue
+		}
+
+		if event.EventType.Value() == "UserPasswordChangedEvent" {
+			var userPasswordChangedEvent events.UserPasswordChangedEvent
+			deserializationErr := json.Unmarshal([]byte(event.Payload), &userPasswordChangedEvent)
+			if deserializationErr != nil {
+				log.Printf("failed to deserialize user password changed event: %s", deserializationErr)
+			}
+
+			err = u.cache.Delete(userPasswordChangedEvent.Username)
+			if err == nil {
+				log.Printf("user %s removed from user repository cache", userPasswordChangedEvent.Username)
+			} else {
+				log.Printf("failed to delete user password changed event: %s", err)
+			}
+		}
 	}
 }
 

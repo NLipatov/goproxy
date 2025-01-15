@@ -5,6 +5,7 @@ import (
 	"goproxy/application"
 	"goproxy/dal"
 	"goproxy/dal/repositories"
+	"goproxy/domain"
 	"goproxy/infrastructure"
 	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/dto"
@@ -51,10 +52,32 @@ func startGoogleAuthController() {
 		log.Fatal(err)
 	}
 
-	userRepository := repositories.NewUserRepository(db, cache)
+	kafkaConf, kafkaConfErr := config.NewKafkaConfig(domain.PROXY)
+	if kafkaConfErr != nil {
+		log.Fatal(kafkaConfErr)
+	}
+
+	messageBusService, err := services.NewKafkaService(kafkaConf)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	userRepoKafkaConf := config.KafkaConfig{
+		BootstrapServers: kafkaConf.BootstrapServers,
+		GroupID:          "user-repository",
+		AutoOffsetReset:  kafkaConf.AutoOffsetReset,
+		Topic:            kafkaConf.Topic,
+	}
+
+	userRepoKafka, userRepoKafkaErr := services.NewKafkaService(userRepoKafkaConf)
+	if userRepoKafkaErr != nil {
+		log.Fatal(userRepoKafkaErr)
+	}
+
+	userRepository := repositories.NewUserRepository(db, cache, userRepoKafka)
 	cryptoService := services.GetCryptoService()
 	userUseCases := application.NewUserUseCases(userRepository, cryptoService)
-	authService := google_auth.NewGoogleAuthService(userUseCases, cryptoService)
+	authService := google_auth.NewGoogleAuthService(userUseCases, cryptoService, messageBusService)
 	controller := google_auth.NewGoogleAuthController(authService)
 
 	controller.Listen(oauthConfig.Port)
@@ -69,7 +92,7 @@ func startPlanController() {
 		_ = db.Close()
 	}(db)
 
-	kafkaConf, kafkaConfErr := config.NewKafkaConfig(config.PLAN)
+	kafkaConf, kafkaConfErr := config.NewKafkaConfig(domain.PLAN)
 	if kafkaConfErr != nil {
 		log.Fatal(kafkaConfErr)
 	}
@@ -137,10 +160,32 @@ func startHttpProxy() {
 		log.Fatal(err)
 	}
 
+	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(domain.PROXY)
+	if kafkaConfigErr != nil {
+		log.Fatal(kafkaConfigErr)
+	}
+
+	kafkaService, kafkaServiceErr := services.NewKafkaService(kafkaConfig)
+	if kafkaServiceErr != nil {
+		log.Fatal(kafkaServiceErr)
+	}
+
+	userRepoKafkaConf := config.KafkaConfig{
+		BootstrapServers: kafkaConfig.BootstrapServers,
+		GroupID:          "user-repository",
+		AutoOffsetReset:  kafkaConfig.AutoOffsetReset,
+		Topic:            kafkaConfig.Topic,
+	}
+
+	userRepoKafka, userRepoKafkaErr := services.NewKafkaService(userRepoKafkaConf)
+	if userRepoKafkaErr != nil {
+		log.Fatal(userRepoKafkaErr)
+	}
+
 	userRestrictionService := services.NewUserRestrictionService()
-	userRepository := repositories.NewUserRepository(db, cache)
+	userRepository := repositories.NewUserRepository(db, cache, userRepoKafka)
 	cryptoService := services.GetCryptoService()
-	authService := services.NewAuthService(cryptoService)
+	authService := services.NewAuthService(cryptoService, kafkaService)
 	authUseCases := application.NewAuthUseCases(authService, userRepository, userRestrictionService)
 
 	go userRestrictionService.ProcessEvents()
@@ -171,7 +216,23 @@ func startHttpRestApi() {
 		log.Fatal(err)
 	}
 
-	userRepository := repositories.NewUserRepository(db, cache)
+	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(domain.PROXY)
+	if kafkaConfigErr != nil {
+		log.Fatal(kafkaConfigErr)
+	}
+
+	userRepoKafkaConf := config.KafkaConfig{
+		BootstrapServers: kafkaConfig.BootstrapServers,
+		GroupID:          "user-repository",
+		AutoOffsetReset:  kafkaConfig.AutoOffsetReset,
+		Topic:            kafkaConfig.Topic,
+	}
+
+	userRepoKafka, userRepoKafkaErr := services.NewKafkaService(userRepoKafkaConf)
+	if userRepoKafkaErr != nil {
+		log.Fatal(userRepoKafkaErr)
+	}
+	userRepository := repositories.NewUserRepository(db, cache, userRepoKafka)
 	cryptoService := services.GetCryptoService()
 	useCases := application.NewUserUseCases(userRepository, cryptoService)
 
