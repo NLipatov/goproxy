@@ -113,7 +113,7 @@ func (a *AuthService) processEvents() {
 			if err == nil {
 				log.Printf("user %s removed from validation cache", userPasswordChangedEvent.Username)
 			} else {
-				log.Printf("failed to delete user password changed event: %s", err)
+				log.Printf("user %s was not removed from validation cache: %s", userPasswordChangedEvent.Username, err)
 			}
 		}
 	}

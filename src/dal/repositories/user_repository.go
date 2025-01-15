@@ -77,7 +77,7 @@ func (u *UserRepository) processEvents() {
 			if err == nil {
 				log.Printf("user %s removed from user repository cache", userPasswordChangedEvent.Username)
 			} else {
-				log.Printf("failed to delete user password changed event: %s", err)
+				log.Printf("user %s was not removed from user repository cache: %s", userPasswordChangedEvent.Username, err)
 			}
 		}
 	}
