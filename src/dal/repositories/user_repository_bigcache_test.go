@@ -20,7 +20,7 @@ func TestSetAndGet(t *testing.T) {
 
 	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
 	email := fmt.Sprintf("%s@example.com", username)
-	user, err := aggregates.NewUser(1, username, email, make([]byte, 32), make([]byte, 32))
+	user, err := aggregates.NewUser(1, username, email, sampleValidArgon2idHash)
 	assert.NoError(t, err)
 
 	err = cache.Set(username, user)
@@ -44,7 +44,7 @@ func TestTTLExpiration(t *testing.T) {
 	}(cache)
 
 	key := "expired_user"
-	user, err := aggregates.NewUser(2, "mark_doe", "example@example.com", make([]byte, 32), make([]byte, 32))
+	user, err := aggregates.NewUser(2, "mark_doe", "example@example.com", sampleValidArgon2idHash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestUpdateAndFetch(t *testing.T) {
 		_ = cache.Dispose()
 	}(cache)
 
-	user, err := aggregates.NewUser(3, "alex_doe", "example@example.com", make([]byte, 32), make([]byte, 32))
+	user, err := aggregates.NewUser(3, "alex_doe", "example@example.com", sampleValidArgon2idHash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestUpdateAndFetch(t *testing.T) {
 	err = cache.Set(key, user)
 	assert.NoError(t, err)
 
-	updatedUser, err := aggregates.NewUser(3, "seth_doe", "example@example.com", make([]byte, 32), make([]byte, 32))
+	updatedUser, err := aggregates.NewUser(3, "seth_doe", "example@example.com", sampleValidArgon2idHash)
 	if err != nil {
 		t.Fatal(err)
 	}

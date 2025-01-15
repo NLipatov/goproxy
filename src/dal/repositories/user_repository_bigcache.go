@@ -17,8 +17,7 @@ type StoredUser struct {
 	Id           int    `msgpack:"Id"`
 	Username     string `msgpack:"Username"`
 	Email        string `msgpack:"Email"`
-	PasswordHash []byte `msgpack:"PasswordHash"`
-	PasswordSalt []byte `msgpack:"PasswordSalt"`
+	PasswordHash string `msgpack:"PasswordHash"`
 }
 
 func ToStoredUser(user aggregates.User) (StoredUser, error) {
@@ -27,12 +26,11 @@ func ToStoredUser(user aggregates.User) (StoredUser, error) {
 		Username:     user.Username(),
 		Email:        user.Email(),
 		PasswordHash: user.PasswordHash(),
-		PasswordSalt: user.PasswordSalt(),
 	}, nil
 }
 
 func FromStoredUser(user StoredUser) (aggregates.User, error) {
-	return aggregates.NewUser(user.Id, user.Username, user.Email, user.PasswordHash, user.PasswordSalt)
+	return aggregates.NewUser(user.Id, user.Username, user.Email, user.PasswordHash)
 }
 
 func NewBigCacheUserRepositoryCache(ttl time.Duration, cleanInterval time.Duration, shards int, maxEntrySizeBytes int) (BigCacheUserRepositoryCache, error) {

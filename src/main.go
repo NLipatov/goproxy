@@ -52,7 +52,7 @@ func startGoogleAuthController() {
 	}
 
 	userRepository := repositories.NewUserRepository(db, cache)
-	cryptoService := services.NewCryptoService(32)
+	cryptoService := services.GetCryptoService()
 	userUseCases := application.NewUserUseCases(userRepository, cryptoService)
 	authService := google_auth.NewGoogleAuthService(userUseCases, cryptoService)
 	controller := google_auth.NewGoogleAuthController(authService)
@@ -139,7 +139,7 @@ func startHttpProxy() {
 
 	userRestrictionService := services.NewUserRestrictionService()
 	userRepository := repositories.NewUserRepository(db, cache)
-	cryptoService := services.NewCryptoService(32)
+	cryptoService := services.GetCryptoService()
 	authService := services.NewAuthService(cryptoService)
 	authUseCases := application.NewAuthUseCases(authService, userRepository, userRestrictionService)
 
@@ -172,7 +172,7 @@ func startHttpRestApi() {
 	}
 
 	userRepository := repositories.NewUserRepository(db, cache)
-	cryptoService := services.NewCryptoService(32)
+	cryptoService := services.GetCryptoService()
 	useCases := application.NewUserUseCases(userRepository, cryptoService)
 
 	usersController := restapi.NewUsersController(useCases)

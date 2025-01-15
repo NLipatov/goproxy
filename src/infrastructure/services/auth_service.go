@@ -41,13 +41,13 @@ func NewAuthService(cryptoService application.CryptoService) *AuthService {
 }
 
 func (authService *AuthService) AuthorizeBasic(user aggregates.User, credentials valueobjects.BasicCredentials) (bool, error) {
-	cacheKey := fmt.Sprintf("%s:%x", credentials.Username, user.PasswordSalt())
+	cacheKey := fmt.Sprintf("%s:%x", credentials.Username, user.PasswordHash())
 	cached, cachedErr := authService.validateCache.Get(cacheKey)
 	if cachedErr == nil {
 		return cached.result, cached.err
 	}
 
-	isPasswordValid := authService.cryptoService.ValidateHash(user.PasswordHash(), user.PasswordSalt(), credentials.Password)
+	isPasswordValid := authService.cryptoService.ValidateHash(user.PasswordHash(), credentials.Password)
 	if !isPasswordValid {
 		return false, fmt.Errorf("invalid credentials")
 	}

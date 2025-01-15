@@ -352,21 +352,14 @@ func (g *GoogleAuthService) ResetPassword(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	salt, err := g.cryptoService.GenerateSalt()
-	if err != nil {
-		log.Printf("failed to reset password - failed to generate salt: %s", err)
-		http.Error(w, "failed to reset password", http.StatusInternalServerError)
-		return
-	}
-
-	hash, err := g.cryptoService.HashValue(password.Value, salt)
+	hash, err := g.cryptoService.HashValue(password.Value)
 	if err != nil {
 		log.Printf("failed to reset password - failed to hash password: %s", err)
 		http.Error(w, "failed to reset password", http.StatusInternalServerError)
 		return
 	}
 
-	updatedUser, updatedUserErr := aggregates.NewUser(user.Id(), user.Username(), user.Email(), hash, salt)
+	updatedUser, updatedUserErr := aggregates.NewUser(user.Id(), user.Username(), user.Email(), hash)
 	if updatedUserErr != nil {
 		log.Printf("failed to reset password - failed to update user: %s", updatedUserErr)
 		http.Error(w, "failed to reset password", http.StatusInternalServerError)

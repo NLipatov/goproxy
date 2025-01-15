@@ -36,17 +36,12 @@ func (u UserUseCases) GetByEmail(email string) (aggregates.User, error) {
 }
 
 func (u UserUseCases) Create(command commands.PostUser) (int, error) {
-	salt, err := u.cryptoService.GenerateSalt()
+	hash, err := u.cryptoService.HashValue(command.Password.Value)
 	if err != nil {
 		return 0, err
 	}
 
-	hash, err := u.cryptoService.HashValue(command.Password.Value, salt)
-	if err != nil {
-		return 0, err
-	}
-
-	user, err := aggregates.NewUser(-1, command.Username, command.Email, hash, salt)
+	user, err := aggregates.NewUser(-1, command.Username, command.Email, hash)
 	if err != nil {
 		return 0, err
 	}
@@ -70,7 +65,7 @@ func (u UserUseCases) Delete(dto commands.DeleteUser) error {
 		return err
 	}
 
-	isPasswordValid := u.cryptoService.ValidateHash(user.PasswordHash(), user.PasswordSalt(), dto.Password.Value)
+	isPasswordValid := u.cryptoService.ValidateHash(user.PasswordHash(), dto.Password.Value)
 	if !isPasswordValid {
 		return fmt.Errorf("invalid password")
 	}

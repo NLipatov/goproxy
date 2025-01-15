@@ -1,7 +1,6 @@
 package repositories
 
 import (
-	"bytes"
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
@@ -10,6 +9,8 @@ import (
 	"testing"
 	"time"
 )
+
+const sampleValidArgon2idHash = "$argon2id$v=19$m=65536,t=3,p=2$c29tZXNhbHQ$RdescudvJCsgt3ub+b+dWRWJTmaaJObG"
 
 func TestUserRepository(t *testing.T) {
 	setEnvErr := os.Setenv("DB_DATABASE", "proxydb")
@@ -74,7 +75,7 @@ func TestUserRepository(t *testing.T) {
 		user, userErr := repo.GetById(userId)
 		assertNoError(t, userErr, "Failed to load user by Id")
 
-		updatedUser, updatedUserErr := aggregates.NewUser(userId, "updated_user", "updated@example.com", []byte("new_hash"), []byte("new_salt"))
+		updatedUser, updatedUserErr := aggregates.NewUser(userId, "updated_user", "updated@example.com", "$argon2id$v=19$m=65536,t=3,p=2$c29tZXNhbHQ$RdescudvJCsgt5ub+b+dWRWJTmaaJObG")
 		if updatedUserErr != nil {
 			t.Fatal(updatedUserErr)
 		}
@@ -89,7 +90,7 @@ func TestUserRepository(t *testing.T) {
 func insertTestUser(repo *UserRepository, t *testing.T) int {
 	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
 	email := fmt.Sprintf("%s@example.com", username)
-	user, err := aggregates.NewUser(-1, username, email, []byte("hashed_password"), []byte("salt"))
+	user, err := aggregates.NewUser(-1, username, email, sampleValidArgon2idHash)
 	assertNoError(t, err, "Failed to create test user")
 	id, err := repo.Create(user)
 	assertNoError(t, err, "Failed to insert test user")
@@ -100,11 +101,8 @@ func assertUsersEqual(t *testing.T, expected, actual aggregates.User) {
 	if expected.Username() != actual.Username() {
 		t.Errorf("Expected Username %s, got %s", expected.Username(), actual.Username())
 	}
-	if !bytes.Equal(expected.PasswordHash(), actual.PasswordHash()) {
+	if expected.PasswordHash() != actual.PasswordHash() {
 		t.Errorf("Expected password hash %x, got %x", expected.PasswordHash(), actual.PasswordHash())
-	}
-	if !bytes.Equal(expected.PasswordSalt(), actual.PasswordSalt()) {
-		t.Errorf("Expected password salt %x, got %x", expected.PasswordSalt(), actual.PasswordSalt())
 	}
 }
 
@@ -112,10 +110,7 @@ func assertUsersNotEqual(t *testing.T, expected, actual aggregates.User) {
 	if expected.Username() == actual.Username() {
 		t.Errorf("Unexpected equal usernames: %s", expected.Username())
 	}
-	if bytes.Equal(expected.PasswordHash(), actual.PasswordHash()) {
-		t.Errorf("Unexpected equal password hashes: %x", expected.PasswordHash())
-	}
-	if bytes.Equal(expected.PasswordSalt(), actual.PasswordSalt()) {
-		t.Errorf("Unexpected equal password salts: %x", expected.PasswordSalt())
+	if expected.PasswordHash() == actual.PasswordHash() {
+		t.Errorf("Unexpected equal password hash %v and %v", expected.PasswordHash(), actual.PasswordHash())
 	}
 }

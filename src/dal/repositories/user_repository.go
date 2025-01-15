@@ -28,11 +28,11 @@ func (u *UserRepository) GetByUsername(username string) (aggregates.User, error)
 	var id int
 	var usernameResult string
 	var emailResult string
-	var passwordHash, salt []byte
+	var passwordHash string
 
 	err = u.db.
-		QueryRow("SELECT id, username, email, password_hash, password_salt FROM public.users WHERE username = $1", username).
-		Scan(&id, &usernameResult, &emailResult, &passwordHash, &salt)
+		QueryRow("SELECT id, username, email, password_hash FROM public.users WHERE username = $1", username).
+		Scan(&id, &usernameResult, &emailResult, &passwordHash)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -41,7 +41,7 @@ func (u *UserRepository) GetByUsername(username string) (aggregates.User, error)
 		return aggregates.User{}, fmt.Errorf("could not load user: %v", err)
 	}
 
-	user, userErr := aggregates.NewUser(id, usernameResult, emailResult, passwordHash, salt)
+	user, userErr := aggregates.NewUser(id, usernameResult, emailResult, passwordHash)
 	if userErr != nil {
 		return aggregates.User{}, fmt.Errorf("invalid user %d stored in db: %v", id, userErr)
 	}
@@ -54,11 +54,11 @@ func (u *UserRepository) GetByUsername(username string) (aggregates.User, error)
 func (u *UserRepository) GetById(id int) (aggregates.User, error) {
 	var username string
 	var email string
-	var passwordHash, salt []byte
+	var passwordHash string
 
 	err := u.db.
-		QueryRow("SELECT id, username, email, password_hash, password_salt FROM public.users WHERE id = $1", id).
-		Scan(&id, &username, &email, &passwordHash, &salt)
+		QueryRow("SELECT id, username, email, password_hash FROM public.users WHERE id = $1", id).
+		Scan(&id, &username, &email, &passwordHash)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -67,7 +67,7 @@ func (u *UserRepository) GetById(id int) (aggregates.User, error) {
 		return aggregates.User{}, fmt.Errorf("could not load user: %v", err)
 	}
 
-	user, userErr := aggregates.NewUser(id, username, email, passwordHash, salt)
+	user, userErr := aggregates.NewUser(id, username, email, passwordHash)
 	if userErr != nil {
 		return aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
 	}
@@ -79,11 +79,11 @@ func (u *UserRepository) GetByEmail(email string) (aggregates.User, error) {
 	var id int
 	var usernameResult string
 	var emailResult string
-	var passwordHash, salt []byte
+	var passwordHash string
 
 	err := u.db.
-		QueryRow("SELECT id, username, email, password_hash, password_salt FROM public.users WHERE email = $1", email).
-		Scan(&id, &usernameResult, &emailResult, &passwordHash, &salt)
+		QueryRow("SELECT id, username, email, password_hash FROM public.users WHERE email = $1", email).
+		Scan(&id, &usernameResult, &emailResult, &passwordHash)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -92,7 +92,7 @@ func (u *UserRepository) GetByEmail(email string) (aggregates.User, error) {
 		return aggregates.User{}, fmt.Errorf("could not load user: %v", err)
 	}
 
-	user, userErr := aggregates.NewUser(id, usernameResult, emailResult, passwordHash, salt)
+	user, userErr := aggregates.NewUser(id, usernameResult, emailResult, passwordHash)
 	if userErr != nil {
 		return aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
 	}
@@ -102,16 +102,16 @@ func (u *UserRepository) GetByEmail(email string) (aggregates.User, error) {
 
 func (u *UserRepository) Create(user aggregates.User) (int, error) {
 	var id int
-	err := u.db.QueryRow("INSERT INTO public.users (username, email, password_hash, password_salt) VALUES ($1, $2, $3, $4) RETURNING id",
-		user.Username(), user.Email(), user.PasswordHash(), user.PasswordSalt(),
+	err := u.db.QueryRow("INSERT INTO public.users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id",
+		user.Username(), user.Email(), user.PasswordHash(),
 	).Scan(&id)
 	return id, err
 }
 
 func (u *UserRepository) Update(user aggregates.User) error {
 	result, err := u.db.
-		Exec("UPDATE public.users SET username = $1, password_hash = $2, password_salt = $3 WHERE id = $4",
-			user.Username(), user.PasswordHash(), user.PasswordSalt(), user.Id())
+		Exec("UPDATE public.users SET username = $1, password_hash = $2 WHERE id = $3",
+			user.Username(), user.PasswordHash(), user.Id())
 	if err != nil {
 		return fmt.Errorf("could not update user: %v", err)
 	}
