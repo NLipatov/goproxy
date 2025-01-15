@@ -26,6 +26,7 @@ func (g *GoogleAuthController) Listen(port int) {
 	mux.HandleFunc("/auth/login", g.authService.handleGoogleLogin)
 	mux.HandleFunc("/auth/callback", g.authService.handleGoogleCallback)
 	mux.HandleFunc("/auth/user-info", g.authService.GetUserInfo)
+	mux.HandleFunc("/auth/reset-password", g.authService.ResetPassword)
 
 	corsHandler := g.AddCORS(mux, getAllowedOrigins())
 

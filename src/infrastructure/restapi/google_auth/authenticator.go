@@ -10,6 +10,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"goproxy/application"
 	"goproxy/application/commands"
+	"goproxy/domain/aggregates"
 	"goproxy/domain/valueobjects"
 	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/restapi"
@@ -227,12 +228,7 @@ func verifyIDToken(idToken string) (*jwt.Token, error) {
 }
 
 func (g *GoogleAuthService) createNewUser(name, email string) (proxyPassword string, err error) {
-	randomString, randomStringErr := g.cryptoService.GenerateRandomString(32)
-	if randomStringErr != nil {
-		return "", fmt.Errorf("failed to register user - failed to generate password: %s", randomStringErr)
-	}
-
-	password, passwordErr := valueobjects.NewPasswordFromString(randomString)
+	password, passwordErr := g.createPassword(32)
 	if passwordErr != nil {
 		return "", fmt.Errorf("failed to register user - failed to create password: %s", passwordErr)
 	}
@@ -309,4 +305,104 @@ func (g *GoogleAuthService) GetUserInfo(w http.ResponseWriter, r *http.Request) 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(response)
+}
+
+type BasicCredentials struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+func (g *GoogleAuthService) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	idToken, err := getIdTokenFromCookie(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	verifiedToken, err := verifyIDToken(idToken)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	claims, ok := verifiedToken.Claims.(jwt.MapClaims)
+	if !ok {
+		http.Error(w, "Failed to parse token claims", http.StatusInternalServerError)
+		return
+	}
+
+	email := claims["email"].(string)
+	if email == "" {
+		log.Printf("failed to reset proxy password: email claim empty")
+		http.Error(w, "Failed to reset password", http.StatusInternalServerError)
+		return
+	}
+
+	user, userErr := g.userUseCases.GetByEmail(email)
+	if userErr != nil {
+		log.Printf("failed to reset proxy user - failed to fetch user: %s", userErr)
+		http.Error(w, "Failed to reset password", http.StatusInternalServerError)
+		return
+	}
+
+	password, passwordErr := g.createPassword(32)
+	if passwordErr != nil {
+		fmt.Printf("failed to reset password - failed to create password: %s", passwordErr)
+		http.Error(w, "failed to reset password", http.StatusInternalServerError)
+		return
+	}
+
+	salt, err := g.cryptoService.GenerateSalt()
+	if err != nil {
+		log.Printf("failed to reset password - failed to generate salt: %s", err)
+		http.Error(w, "failed to reset password", http.StatusInternalServerError)
+		return
+	}
+
+	hash, err := g.cryptoService.HashValue(password.Value, salt)
+	if err != nil {
+		log.Printf("failed to reset password - failed to hash password: %s", err)
+		http.Error(w, "failed to reset password", http.StatusInternalServerError)
+		return
+	}
+
+	updatedUser, updatedUserErr := aggregates.NewUser(user.Id(), user.Username(), user.Email(), hash, salt)
+	if updatedUserErr != nil {
+		log.Printf("failed to reset password - failed to update user: %s", updatedUserErr)
+		http.Error(w, "failed to reset password", http.StatusInternalServerError)
+		return
+	}
+
+	updateErr := g.userUseCases.Update(updatedUser)
+	if updateErr != nil {
+		log.Printf("failed to reset password - failed to update user: %s", updateErr)
+		http.Error(w, "failed to reset password", http.StatusInternalServerError)
+		return
+	}
+
+	updatedBasicCredentials := BasicCredentials{
+		Username: user.Username(),
+		Password: password.Value,
+	}
+	serializedCredentials, serializedCredentialsErr := json.Marshal(updatedBasicCredentials)
+	if serializedCredentialsErr != nil {
+		log.Printf("failed to reset password - failed to serialize credentials: %s", serializedCredentialsErr)
+		http.Error(w, "failed to reset password", http.StatusInternalServerError)
+		return
+	}
+	_, _ = w.Write(serializedCredentials)
+}
+
+func (g *GoogleAuthService) createPassword(length int) (valueobjects.Password, error) {
+	randomString, randomStringErr := g.cryptoService.GenerateRandomString(length)
+	if randomStringErr != nil {
+		return valueobjects.Password{}, fmt.Errorf("failed to register user - failed to generate password: %s", randomStringErr)
+	}
+
+	password, passwordErr := valueobjects.NewPasswordFromString(randomString)
+	if passwordErr != nil {
+		return valueobjects.Password{}, fmt.Errorf("failed to register user - failed to create password: %s", passwordErr)
+	}
+
+	return password, nil
 }
