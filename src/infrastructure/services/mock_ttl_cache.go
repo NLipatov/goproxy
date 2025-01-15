@@ -2,16 +2,11 @@ package services
 
 import (
 	"errors"
-	"goproxy/application"
 	"time"
 )
 
 type MockTTLCache[T any] struct {
 	storage map[string]T
-}
-
-func NewMockTTLCache[T any]() application.CacheWithTTL[T] {
-	return &MockTTLCache[T]{storage: make(map[string]T)}
 }
 
 func (m *MockTTLCache[T]) Get(key string) (T, error) {
@@ -28,7 +23,12 @@ func (m *MockTTLCache[T]) Set(key string, value T) error {
 	return nil
 }
 
-func (m *MockTTLCache[T]) Expire(key string, ttl time.Duration) error {
+func (m *MockTTLCache[T]) Expire(key string, _ time.Duration) error {
+	delete(m.storage, key)
+	return nil
+}
+
+func (m *MockTTLCache[T]) Delete(key string) error {
 	delete(m.storage, key)
 	return nil
 }

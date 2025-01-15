@@ -74,6 +74,11 @@ func (mc *mockCache) Expire(key string, ttl time.Duration) error {
 	return nil
 }
 
+func (mc *mockCache) Delete(key string) error {
+	delete(mc.data, key)
+	return nil
+}
+
 func (mc *noSetMockCache) Get(key string) (validateResult, error) {
 	mc.getCalls++
 	if result, exists := mc.data[key]; exists {
@@ -93,6 +98,12 @@ func (mc *noSetMockCache) Expire(key string, ttl time.Duration) error {
 	mc.ttl[key] = time.Now().Add(ttl)
 	return nil
 }
+
+func (mc *noSetMockCache) Delete(key string) error {
+	delete(mc.data, key)
+	return nil
+}
+
 func TestAuthorizeBasic_Success(t *testing.T) {
 	var ValidateHashFuncCalls int
 	cryptoService := &mockCryptoService{

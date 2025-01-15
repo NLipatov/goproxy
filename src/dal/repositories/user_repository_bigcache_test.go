@@ -108,3 +108,35 @@ func TestDispose(t *testing.T) {
 	err = cache.Dispose()
 	assert.NoError(t, err, "failed to dispose the cache")
 }
+
+func TestDelete(t *testing.T) {
+	ttl := 1 * time.Minute
+	cleanInterval := 30 * time.Second
+	shards := 1024
+	maxEntrySize := 500
+
+	cache, err := NewBigCacheUserRepositoryCache(ttl, cleanInterval, shards, maxEntrySize)
+	assert.NoError(t, err)
+	defer func(cache BigCacheUserRepositoryCache) {
+		_ = cache.Dispose()
+	}(cache)
+
+	key := "user_to_delete"
+	user, err := aggregates.NewUser(4, "jane_doe", "jane@example.com", sampleValidArgon2idHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cache.Set(key, user)
+	assert.NoError(t, err, "failed to set user in cache")
+
+	fetchedUser, err := cache.Get(key)
+	assert.NoError(t, err, "failed to fetch user from cache")
+	assert.Equal(t, user, fetchedUser, "fetched user does not match the original")
+
+	err = cache.Delete(key)
+	assert.NoError(t, err, "failed to delete user from cache")
+
+	_, err = cache.Get(key)
+	assert.Error(t, err, "expected error when fetching deleted user")
+}

@@ -79,6 +79,10 @@ func (b BigCacheUserRepositoryCache) Set(key string, user aggregates.User) error
 	return b.cache.Set(key, userBytes)
 }
 
+func (b BigCacheUserRepositoryCache) Delete(key string) error {
+	return b.cache.Delete(key)
+}
+
 func (b BigCacheUserRepositoryCache) Dispose() error {
 	return b.cache.Close()
 }

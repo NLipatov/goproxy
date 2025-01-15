@@ -66,3 +66,17 @@ func (c *MapCacheWithTTL[T]) Expire(key string, ttl time.Duration) error {
 	c.data[key] = entry
 	return nil
 }
+
+func (c *MapCacheWithTTL[T]) Delete(key string) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	entry, exists := c.data[key]
+	if !exists {
+		return nil
+	}
+
+	entry.expiration = time.Now()
+	c.data[key] = entry
+	return nil
+}

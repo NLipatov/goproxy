@@ -88,3 +88,8 @@ func (r *RedisCache[T]) Expire(key string, ttl time.Duration) error {
 	ctx := context.Background()
 	return r.client.Expire(ctx, key, ttl).Err()
 }
+
+func (r *RedisCache[T]) Delete(key string) error {
+	_ = r.Expire(key, time.Second)
+	return nil
+}
