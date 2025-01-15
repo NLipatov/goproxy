@@ -16,6 +16,11 @@ type mockCryptoService struct {
 	ValidateHashFunc func(hash []byte, salt []byte, password string) bool
 }
 
+func (m *mockCryptoService) GenerateRandomString(length int) (string, error) {
+	randomBytes := make([]byte, length)
+	return string(randomBytes), nil
+}
+
 func (m *mockCryptoService) ValidateHash(hash []byte, salt []byte, password string) bool {
 	return m.ValidateHashFunc(hash, salt, password)
 }
