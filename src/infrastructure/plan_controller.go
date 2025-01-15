@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"goproxy/application"
+	"goproxy/domain"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/events"
 	"goproxy/infrastructure/config"
@@ -72,7 +73,7 @@ func (p *PlanController) ProcessEvents() {
 		_ = messageBus.Close()
 	}(p.messageBus)
 
-	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(config.PLAN)
+	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(domain.PLAN)
 	if kafkaConfigErr != nil {
 		log.Fatalf("Error creating kafka config: %v", kafkaConfigErr)
 	}
@@ -201,7 +202,7 @@ func (p *PlanController) produceUserWithNoPlanEvent(userId int) error {
 		return outboxEventValidationErr
 	}
 
-	produceErr := p.messageBus.Produce(fmt.Sprintf("%s", config.PROXY), outboxEvent)
+	produceErr := p.messageBus.Produce(fmt.Sprintf("%s", domain.PROXY), outboxEvent)
 	if produceErr != nil {
 		return produceErr
 	}
@@ -222,7 +223,7 @@ func (p *PlanController) produceUserExceededTrafficLimitEvent(userId int) error 
 		return outboxEventValidationErr
 	}
 
-	produceErr := p.messageBus.Produce(fmt.Sprintf("%s", config.PROXY), outboxEvent)
+	produceErr := p.messageBus.Produce(fmt.Sprintf("%s", domain.PROXY), outboxEvent)
 	if produceErr != nil {
 		return produceErr
 	}

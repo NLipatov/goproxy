@@ -33,6 +33,6 @@ func ParseEmailFromString(value string) (Email, error) {
 	}, nil
 }
 
-func (email Email) String() string {
-	return email.value
+func (e Email) String() string {
+	return e.value
 }

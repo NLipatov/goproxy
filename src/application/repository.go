@@ -15,6 +15,7 @@ type Repository[T any] interface {
 type UserRepository interface {
 	Repository[aggregates.User]
 	GetByUsername(username string) (aggregates.User, error)
+	GetByEmail(email string) (aggregates.User, error)
 }
 
 type EventRepository interface {

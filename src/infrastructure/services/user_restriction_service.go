@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goproxy/application"
+	"goproxy/domain"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/events"
 	"goproxy/infrastructure/config"
@@ -29,7 +30,7 @@ func NewUserRestrictionService() *UserRestrictionService {
 		log.Fatalf("failed to initialize redis cache: %v", redisCacheErr)
 	}
 
-	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(config.PROXY)
+	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(domain.PROXY)
 	if kafkaConfigErr != nil {
 		log.Fatal(kafkaConfigErr)
 	}
@@ -121,7 +122,7 @@ func (u *UserRestrictionService) ProcessEvents() {
 		_ = messageBus.Close()
 	}(u.messageBus)
 
-	topics := []string{fmt.Sprintf("%s", config.PROXY)}
+	topics := []string{fmt.Sprintf("%s", domain.PROXY)}
 	err := u.messageBus.Subscribe(topics)
 	if err != nil {
 		log.Fatalf("Failed to subscribe to topics: %s", err)

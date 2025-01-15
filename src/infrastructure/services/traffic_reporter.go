@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goproxy/application"
+	"goproxy/domain"
 	"goproxy/domain/events"
 	"goproxy/infrastructure/config"
 	"log"
@@ -25,7 +26,7 @@ type TrafficReporter struct {
 }
 
 func NewTrafficReporter(userId int, threshold int64, interval time.Duration) (*TrafficReporter, error) {
-	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(config.PROXY)
+	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(domain.PROXY)
 	if kafkaConfigErr != nil {
 		log.Fatalf("Error creating kafka config: %v", kafkaConfigErr)
 	}
@@ -109,7 +110,7 @@ func (tr *TrafficReporter) ProduceTrafficConsumedEvent(in, out int64) error {
 		return outboxEventValidationErr
 	}
 
-	produceErr := tr.messageBus.Produce(fmt.Sprintf("%s", config.PLAN), outboxEvent)
+	produceErr := tr.messageBus.Produce(fmt.Sprintf("%s", domain.PLAN), outboxEvent)
 	if produceErr != nil {
 		log.Printf("Could not produce outbox event: %v", produceErr)
 		return produceErr

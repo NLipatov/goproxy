@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
+	"log"
 	"os"
 )
 
@@ -22,13 +23,28 @@ func ConnectDB() (*sql.DB, error) {
 
 func buildConnectionString() (string, error) {
 	dbUser := os.Getenv("DB_USER")
-	dbPass := os.Getenv("DB_PASS")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbDatabase := os.Getenv("DB_DATABASE")
+	if dbUser == "" {
+		log.Fatalf("DB_USER environment variable not set")
+	}
 
-	if dbUser == "" || dbPass == "" || dbHost == "" || dbPort == "" || dbDatabase == "" {
-		return "", fmt.Errorf("invalid db credentials")
+	dbPass := os.Getenv("DB_PASS")
+	if dbPass == "" {
+		log.Fatalf("DB_PASS environment variable not set")
+	}
+
+	dbHost := os.Getenv("DB_HOST")
+	if dbHost == "" {
+		log.Fatalf("DB_HOST environment variable not set")
+	}
+
+	dbPort := os.Getenv("DB_PORT")
+	if dbPort == "" {
+		log.Fatalf("DB_PORT environment variable not set")
+	}
+
+	dbDatabase := os.Getenv("DB_DATABASE")
+	if dbDatabase == "" {
+		log.Fatalf("DB_DATABASE environment variable not set")
 	}
 
 	dataSourceName := fmt.

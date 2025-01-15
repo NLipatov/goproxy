@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"goproxy/domain"
 	"os"
 )
 
@@ -19,8 +20,8 @@ type KafkaConfig struct {
 	Topic            string
 }
 
-func NewKafkaConfig(context BoundedContext) (KafkaConfig, error) {
-	if context == UNSET {
+func NewKafkaConfig(context domain.BoundedContexts) (KafkaConfig, error) {
+	if context == domain.UNSET {
 		return KafkaConfig{}, fmt.Errorf("unset context")
 	}
 
@@ -52,7 +53,7 @@ func NewKafkaConfig(context BoundedContext) (KafkaConfig, error) {
 	}, nil
 }
 
-func getEnv(context BoundedContext, envVarName string) (string, error) {
+func getEnv(context domain.BoundedContexts, envVarName string) (string, error) {
 	envVarKey := fmt.Sprintf("%s_%s", context, envVarName)
 	value := os.Getenv(envVarKey)
 	if value == "" {

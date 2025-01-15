@@ -1,7 +1,7 @@
 package application
 
 type CryptoService interface {
-	GenerateSalt() ([]byte, error)
-	HashValue(value string, salt []byte) ([]byte, error)
-	ValidateHash(hash []byte, salt []byte, password string) bool
+	GenerateRandomString(length int) (string, error)
+	HashValue(value string) (string, error)
+	ValidateHash(fullHash, password string) bool
 }

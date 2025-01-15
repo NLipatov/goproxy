@@ -12,20 +12,23 @@ import (
 	"goproxy/domain/valueobjects"
 )
 
+const sampleValidArgon2idHash = "$argon2id$v=19$m=65536,t=3,p=2$c29tZXNhbHQ$RdescudvJCsgt3ub+b+dWRWJTmaaJObG"
+
 type mockCryptoService struct {
-	ValidateHashFunc func(hash []byte, salt []byte, password string) bool
+	ValidateHashFunc func(fullHash, password string) bool
 }
 
-func (m *mockCryptoService) ValidateHash(hash []byte, salt []byte, password string) bool {
-	return m.ValidateHashFunc(hash, salt, password)
+func (m *mockCryptoService) GenerateRandomString(length int) (string, error) {
+	randomBytes := make([]byte, length)
+	return string(randomBytes), nil
 }
 
-func (m *mockCryptoService) GenerateSalt() ([]byte, error) {
-	return []byte("salt"), nil
+func (m *mockCryptoService) ValidateHash(fullHash, password string) bool {
+	return m.ValidateHashFunc(fullHash, password)
 }
 
-func (m *mockCryptoService) HashValue(string, []byte) ([]byte, error) {
-	return []byte("hashedPassword"), nil
+func (m *mockCryptoService) HashValue(string) (string, error) {
+	return sampleValidArgon2idHash, nil
 }
 
 type mockCache struct {
@@ -71,6 +74,11 @@ func (mc *mockCache) Expire(key string, ttl time.Duration) error {
 	return nil
 }
 
+func (mc *mockCache) Delete(key string) error {
+	delete(mc.data, key)
+	return nil
+}
+
 func (mc *noSetMockCache) Get(key string) (validateResult, error) {
 	mc.getCalls++
 	if result, exists := mc.data[key]; exists {
@@ -90,17 +98,24 @@ func (mc *noSetMockCache) Expire(key string, ttl time.Duration) error {
 	mc.ttl[key] = time.Now().Add(ttl)
 	return nil
 }
+
+func (mc *noSetMockCache) Delete(key string) error {
+	delete(mc.data, key)
+	return nil
+}
+
 func TestAuthorizeBasic_Success(t *testing.T) {
 	var ValidateHashFuncCalls int
 	cryptoService := &mockCryptoService{
-		ValidateHashFunc: func(hash []byte, salt []byte, password string) bool {
+		ValidateHashFunc: func(fullHash, password string) bool {
 			ValidateHashFuncCalls++
 			return true
 		},
 	}
 	cache := newMockCache()
 
-	user, userErr := aggregates.NewUser(1, "username", []byte("hashedPassword"), []byte("salt"))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	user, userErr := aggregates.NewUser(1, username, fmt.Sprintf("%s@example.com", username), sampleValidArgon2idHash)
 	if userErr != nil {
 		t.Fatal(userErr)
 	}
@@ -125,14 +140,15 @@ func TestAuthorizeBasic_Success(t *testing.T) {
 func TestAuthorizeBasic_InvalidCredentials(t *testing.T) {
 	var ValidateHashFuncCalls int
 	cryptoService := &mockCryptoService{
-		ValidateHashFunc: func(hash []byte, salt []byte, password string) bool {
+		ValidateHashFunc: func(fullHash, password string) bool {
 			ValidateHashFuncCalls++
 			return false
 		},
 	}
 	cache := newMockCache()
 
-	user, userErr := aggregates.NewUser(1, "username", []byte("hashedPassword"), []byte("salt"))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	user, userErr := aggregates.NewUser(1, username, fmt.Sprintf("%s@example.com", username), sampleValidArgon2idHash)
 	if userErr != nil {
 		t.Fatal(userErr)
 	}
@@ -157,14 +173,15 @@ func TestAuthorizeBasic_InvalidCredentials(t *testing.T) {
 func TestAuthorizeBasic_CacheUsage(t *testing.T) {
 	var ValidateHashFuncCalls int
 	cryptoService := &mockCryptoService{
-		ValidateHashFunc: func(hash []byte, salt []byte, password string) bool {
+		ValidateHashFunc: func(fullHash, password string) bool {
 			ValidateHashFuncCalls++
 			return true
 		},
 	}
 	cache := newMockCache()
 
-	user, userErr := aggregates.NewUser(1, "username", []byte("hashedPassword"), []byte("salt"))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	user, userErr := aggregates.NewUser(1, username, fmt.Sprintf("%s@example.com", username), sampleValidArgon2idHash)
 	if userErr != nil {
 		t.Fatal(userErr)
 	}
@@ -199,14 +216,15 @@ func TestAuthorizeBasic_CacheUsage(t *testing.T) {
 func TestAuthorizeBasic_CacheExpiry(t *testing.T) {
 	var ValidateHashFuncCalls int
 	cryptoService := &mockCryptoService{
-		ValidateHashFunc: func(hash []byte, salt []byte, password string) bool {
+		ValidateHashFunc: func(fullHash, password string) bool {
 			ValidateHashFuncCalls++
 			return true
 		},
 	}
 	cache := newMockCache()
 
-	user, userErr := aggregates.NewUser(1, "username", []byte("hashedPassword"), []byte("salt"))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	user, userErr := aggregates.NewUser(1, username, fmt.Sprintf("%s@example.com", username), sampleValidArgon2idHash)
 	if userErr != nil {
 		t.Fatal(userErr)
 	}
@@ -246,14 +264,15 @@ func TestAuthorizeBasic_CacheExpiry(t *testing.T) {
 func TestAuthorizeBasic_MinTTL(t *testing.T) {
 	var ValidateHashFuncCalls int
 	cryptoService := &mockCryptoService{
-		ValidateHashFunc: func(hash []byte, salt []byte, password string) bool {
+		ValidateHashFunc: func(fullHash, password string) bool {
 			ValidateHashFuncCalls++
 			return true
 		},
 	}
 	cache := newMockCache()
 
-	user, userErr := aggregates.NewUser(1, "username", []byte("hashedPassword"), []byte("salt"))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	user, userErr := aggregates.NewUser(1, username, fmt.Sprintf("%s@example.com", username), sampleValidArgon2idHash)
 	if userErr != nil {
 		t.Fatal(userErr)
 	}
@@ -295,7 +314,7 @@ func TestAuthorizeBasic_MinTTL(t *testing.T) {
 
 func TestAuthorizeBasic_CacheError(t *testing.T) {
 	cryptoService := &mockCryptoService{
-		ValidateHashFunc: func(hash []byte, salt []byte, password string) bool {
+		ValidateHashFunc: func(fullHash, password string) bool {
 			return true
 		},
 	}
@@ -305,7 +324,8 @@ func TestAuthorizeBasic_CacheError(t *testing.T) {
 		ttl:  make(map[string]time.Time),
 	}
 
-	user, _ := aggregates.NewUser(1, "username", []byte("hashedPassword"), []byte("salt"))
+	username := fmt.Sprintf("test_user_%d", time.Now().UTC().UnixNano())
+	user, _ := aggregates.NewUser(1, username, fmt.Sprintf("%s@example.com", username), sampleValidArgon2idHash)
 
 	authService := AuthService{
 		cryptoService:    cryptoService,

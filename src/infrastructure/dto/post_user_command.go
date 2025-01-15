@@ -7,6 +7,7 @@ import (
 
 type PostUserCommand struct {
 	Username string
+	Email    string
 	Password string
 }
 
@@ -18,6 +19,7 @@ func (dto *PostUserCommand) ToCreateUserCommand() (commands.PostUser, error) {
 
 	return commands.PostUser{
 		Username: dto.Username,
+		Email:    dto.Email,
 		Password: password,
 	}, nil
 }
