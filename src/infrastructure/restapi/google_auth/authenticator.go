@@ -121,7 +121,8 @@ func (g *GoogleAuthService) handleGoogleCallback(w http.ResponseWriter, r *http.
 	_, userErr := g.userUseCases.GetByEmail(userInfo.Email)
 	if userErr != nil {
 		if strings.Contains(userErr.Error(), "user not found") {
-			newProxyPassword, createUserErr := g.createNewUser(userInfo.Name, userInfo.Email)
+			normalizedUsername := valueobjects.NormalizeUsername(userInfo.Name)
+			newProxyPassword, createUserErr := g.createNewUser(normalizedUsername, userInfo.Email)
 			if createUserErr != nil {
 				log.Printf("Failed to create new user: %s", createUserErr.Error())
 				http.Error(w, "failed to generate new user", http.StatusInternalServerError)
