@@ -99,6 +99,39 @@ services:
     depends_on:
       lt-billing-postgres:
         condition: service_healthy
+  
+  google-auth-api:
+    build:
+      context: ./src
+    container_name: google-auth-api
+    ports:
+      - "3030:3030"
+    environment:
+      - MODE=google-auth
+      - SERVE_PORT=3030
+      - ALLOWED_ORIGINS=*
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - ENVIRONMENT=development
+      - GOOGLE_AUTH_CLIENT_ID=${GOOGLE_AUTH_CLIENT_ID}
+      - GOOGLE_AUTH_CLIENT_SECRET=${GOOGLE_AUTH_CLIENT_SECRET}
+      - GOOGLE_AUTH_HOST=${GOOGLE_AUTH_HOST}
+      - GOOGLE_AUTH_PORT=${GOOGLE_AUTH_PORT}
+      - PROXY_KAFKA_AUTO_OFFSET_RESET=${PROXY_KAFKA_AUTO_OFFSET_RESET}
+      - PROXY_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - PROXY_KAFKA_GROUP_ID=GOOGLE-AUTH
+      - PROXY_KAFKA_TOPIC=PROXY
+      - TC_CACHE_HOST=${TC_CACHE_HOST}
+      - TC_CACHE_PORT=${TC_CACHE_PORT}
+      - TC_CACHE_USER=${TC_CACHE_USER}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      plan-controller-cache:
+        condition: service_healthy
         
   proxy:
     build:
