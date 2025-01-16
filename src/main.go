@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"goproxy/application"
 	"goproxy/dal"
@@ -89,16 +90,6 @@ func startPlanController() {
 		_ = db.Close()
 	}(db)
 
-	kafkaConf, kafkaConfErr := config.NewKafkaConfig(domain.PLAN)
-	if kafkaConfErr != nil {
-		log.Fatal(kafkaConfErr)
-	}
-
-	messageBusService, err := services.NewKafkaService(kafkaConf)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	redisCache, newRedisClientErr := services.NewRedisCache[dto.UserTraffic]()
 	if newRedisClientErr != nil {
 		log.Fatalf("failed to instantiate redis cache service: %s", newRedisClientErr)
@@ -107,18 +98,21 @@ func startPlanController() {
 	planRepo := repositories.NewPlansRepository(db)
 	userPlanRepo := repositories.NewUserPlanRepository(db)
 
-	controller, err := infrastructure.NewTrafficCollector().
-		UsePlanRepository(planRepo).
-		UseUserPlanRepository(userPlanRepo).
-		UseMessageBus(messageBusService).
-		UseCache(redisCache).
-		Build()
+	userConsumedTrafficEventProcessorErr := eventhandlers.
+		NewUserConsumedTrafficEventProcessor(redisCache, userPlanRepo, planRepo, domain.PLAN).
+		ProcessEvents()
 
-	if err != nil {
-		log.Fatalf("failed to instantiate plan controller: %s", err)
+	if userConsumedTrafficEventProcessorErr != nil {
+		log.Fatal(userConsumedTrafficEventProcessorErr)
 	}
 
-	controller.ProcessEvents()
+	for {
+		select {
+		case <-context.Background().Done():
+			return
+		default:
+		}
+	}
 }
 
 func startKafkaRelay() {

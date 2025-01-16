@@ -8,7 +8,6 @@ import (
 	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/services"
 	"log"
-	"time"
 )
 
 type UserPasswordChangedEventProcessor[T any] struct {
@@ -24,7 +23,6 @@ func NewUserPasswordChangedEventProcessor[T any](boundedContext domain.BoundedCo
 }
 
 func (c *UserPasswordChangedEventProcessor[T]) ProcessEvents() error {
-	groupId := time.Now().Unix()
 	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(c.boundedContext)
 	if kafkaConfigErr != nil {
 		return kafkaConfigErr
@@ -32,7 +30,7 @@ func (c *UserPasswordChangedEventProcessor[T]) ProcessEvents() error {
 
 	kafkaConf := config.KafkaConfig{
 		BootstrapServers: kafkaConfig.BootstrapServers,
-		GroupID:          fmt.Sprintf("%v", groupId),
+		GroupID:          "UserPasswordChangedEventProcessor",
 		AutoOffsetReset:  kafkaConfig.AutoOffsetReset,
 		Topic:            kafkaConfig.Topic,
 	}
