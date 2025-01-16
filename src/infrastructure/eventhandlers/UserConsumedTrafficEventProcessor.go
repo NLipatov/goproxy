@@ -5,21 +5,21 @@ import (
 	"fmt"
 	"goproxy/application"
 	"goproxy/domain"
+	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure/config"
-	"goproxy/infrastructure/dto"
 	"goproxy/infrastructure/services"
 	"log"
 )
 
 type UserConsumedTrafficEventProcessor struct {
 	boundedContext     domain.BoundedContexts
-	cache              application.CacheWithTTL[dto.UserTraffic]
+	cache              application.CacheWithTTL[dataobjects.UserTraffic]
 	userPlanRepository application.UserPlanRepository
 	planRepository     application.PlanRepository
 	messageBus         application.MessageBusService
 }
 
-func NewUserConsumedTrafficEventProcessor(cache application.CacheWithTTL[dto.UserTraffic],
+func NewUserConsumedTrafficEventProcessor(cache application.CacheWithTTL[dataobjects.UserTraffic],
 	userPlanRepository application.UserPlanRepository,
 	planRepository application.PlanRepository,
 	boundedContext domain.BoundedContexts) *UserConsumedTrafficEventProcessor {

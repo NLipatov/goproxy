@@ -109,7 +109,7 @@ services:
     environment:
       - MODE=google-auth
       - SERVE_PORT=3030
-      - ALLOWED_ORIGINS=*
+      - ALLOWED_ORIGINS=http://localhost:5173
       - DB_DATABASE=${DB_DATABASE}
       - DB_USER=${DB_USER}
       - DB_PASS=${DB_PASS}
@@ -282,6 +282,7 @@ services:
       - TC_CACHE_PORT=${TC_CACHE_PORT}
       - TC_CACHE_USER=${TC_CACHE_USER}
       - TC_CACHE_PASSWORD=${TC_CACHE_PASSWORD}
+      - ALLOWED_ORIGINS=http://localhost:5173
     depends_on:
       init-kafka-topics:
         condition: service_completed_successfully

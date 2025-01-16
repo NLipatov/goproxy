@@ -8,12 +8,13 @@ import (
 	"goproxy/dal/repositories"
 	"goproxy/domain"
 	"goproxy/domain/aggregates"
+	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure"
+	"goproxy/infrastructure/api/api-http"
+	"goproxy/infrastructure/api/api-http/google_auth"
+	"goproxy/infrastructure/api/api-ws"
 	"goproxy/infrastructure/config"
-	"goproxy/infrastructure/dto"
 	"goproxy/infrastructure/eventhandlers"
-	"goproxy/infrastructure/restapi"
-	"goproxy/infrastructure/restapi/google_auth"
 	"goproxy/infrastructure/services"
 	"log"
 	"os"
@@ -77,7 +78,6 @@ func startGoogleAuthController() {
 	userUseCases := application.NewUserUseCases(userRepo, cryptoService)
 	authService := google_auth.NewGoogleAuthService(userUseCases, cryptoService, messageBusService)
 	controller := google_auth.NewGoogleAuthController(authService)
-
 	controller.Listen(oauthConfig.Port)
 }
 
@@ -90,21 +90,38 @@ func startPlanController() {
 		_ = db.Close()
 	}(db)
 
-	redisCache, newRedisClientErr := services.NewRedisCache[dto.UserTraffic]()
-	if newRedisClientErr != nil {
-		log.Fatalf("failed to instantiate redis cache service: %s", newRedisClientErr)
+	trafficCache, trafficCacheErr := services.NewRedisCache[dataobjects.UserTraffic]()
+	if trafficCacheErr != nil {
+		log.Fatalf("failed to instantiate cache service: %s", trafficCacheErr)
 	}
 
 	planRepo := repositories.NewPlansRepository(db)
 	userPlanRepo := repositories.NewUserPlanRepository(db)
 
 	userConsumedTrafficEventProcessorErr := eventhandlers.
-		NewUserConsumedTrafficEventProcessor(redisCache, userPlanRepo, planRepo, domain.PLAN).
+		NewUserConsumedTrafficEventProcessor(trafficCache, userPlanRepo, planRepo, domain.PLAN).
 		ProcessEvents()
 
 	if userConsumedTrafficEventProcessorErr != nil {
 		log.Fatal(userConsumedTrafficEventProcessorErr)
 	}
+
+	bigCache, err := repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	planCache, planCacheErr := services.NewRedisCache[dataobjects.UserPlan]()
+	if planCacheErr != nil {
+		log.Fatalf("failed to instantiate cache service: %s", planCacheErr)
+	}
+
+	userRepo := repositories.NewUserRepository(db, bigCache)
+	userPlanInfoUseCases := application.NewUserPlanInfoUseCases(planRepo, userPlanRepo, userRepo, planCache, trafficCache)
+	cryptoService := services.GetCryptoService()
+	userUseCases := application.NewUserUseCases(userRepo, cryptoService)
+	planController := api_ws.NewPlanController(userUseCases, userPlanInfoUseCases)
+	planController.Listen(3031)
 
 	for {
 		select {
@@ -217,7 +234,7 @@ func startHttpRestApi() {
 	cryptoService := services.GetCryptoService()
 	useCases := application.NewUserUseCases(userRepo, cryptoService)
 
-	usersController := restapi.NewUsersController(useCases)
+	usersController := api_http.NewUsersController(useCases)
 	err = usersController.ServePort(port)
 	if err != nil {
 		log.Printf("Failed serving port: %v", err)

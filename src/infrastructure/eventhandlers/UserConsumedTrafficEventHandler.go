@@ -7,8 +7,8 @@ import (
 	"goproxy/application"
 	"goproxy/domain"
 	"goproxy/domain/aggregates"
+	"goproxy/domain/dataobjects"
 	"goproxy/domain/events"
-	"goproxy/infrastructure/dto"
 	"goproxy/infrastructure/infraerrs"
 	"log"
 	"strings"
@@ -16,13 +16,13 @@ import (
 )
 
 type UserConsumedTrafficEventHandler struct {
-	cache              application.CacheWithTTL[dto.UserTraffic]
+	cache              application.CacheWithTTL[dataobjects.UserTraffic]
 	userPlanRepository application.UserPlanRepository
 	planRepository     application.PlanRepository
 	messageBus         application.MessageBusService
 }
 
-func NewUserConsumedTrafficEventHandler(cache application.CacheWithTTL[dto.UserTraffic],
+func NewUserConsumedTrafficEventHandler(cache application.CacheWithTTL[dataobjects.UserTraffic],
 	userPlanRepository application.UserPlanRepository,
 	planRepository application.PlanRepository,
 	messageBus application.MessageBusService) application.EventHandler {
@@ -43,7 +43,7 @@ func (u *UserConsumedTrafficEventHandler) Handle(payload string) error {
 
 	currentTraffic, err := u.cache.Get(u.cacheKey(event.UserId))
 	if err != nil {
-		newUserTraffic := dto.UserTraffic{}
+		newUserTraffic := dataobjects.UserTraffic{}
 		//if cache miss - try load it form DB
 		if strings.Contains(err.Error(), "not found") {
 			dbResult, loadErr := u.loadFromDB(event.UserId)
@@ -78,14 +78,14 @@ func (u *UserConsumedTrafficEventHandler) Handle(payload string) error {
 }
 
 func (u *UserConsumedTrafficEventHandler) cacheKey(userId int) string {
-	return fmt.Sprintf("user:%d:traffic:%s", userId, time.Now().UTC().Format("02-01-2006"))
+	return fmt.Sprintf("user:%d:traffic", userId)
 }
-func (u *UserConsumedTrafficEventHandler) loadFromDB(userId int) (dto.UserTraffic, error) {
+func (u *UserConsumedTrafficEventHandler) loadFromDB(userId int) (dataobjects.UserTraffic, error) {
 	activePlan, err := u.loadUserPlan(userId)
 	if err != nil {
-		return dto.UserTraffic{}, err
+		return dataobjects.UserTraffic{}, err
 	}
-	userTraffic := dto.UserTraffic{
+	userTraffic := dataobjects.UserTraffic{
 		InBytes:        0,
 		OutBytes:       0,
 		PlanLimitBytes: activePlan.LimitBytes(),

@@ -14,8 +14,8 @@ import (
 	"goproxy/domain/aggregates"
 	"goproxy/domain/events"
 	"goproxy/domain/valueobjects"
+	"goproxy/infrastructure/api/Cookie"
 	"goproxy/infrastructure/config"
-	"goproxy/infrastructure/restapi"
 	"goproxy/infrastructure/services"
 	"io"
 	"log"
@@ -34,7 +34,7 @@ type authData struct {
 type GoogleAuthService struct {
 	userUseCases        application.UserUseCases
 	cryptoService       application.CryptoService
-	cookieBuilder       restapi.CookieBuilder
+	cookieBuilder       Cookie.CookieBuilder
 	cache               application.CacheWithTTL[authData]
 	oauthConfigProvider config.GoogleOauthConfigProvider
 	messageBus          application.MessageBusService
@@ -49,7 +49,7 @@ func NewGoogleAuthService(userUseCases application.UserUseCases, cryptoService a
 	return &GoogleAuthService{
 		userUseCases:        userUseCases,
 		cryptoService:       cryptoService,
-		cookieBuilder:       restapi.NewCookieBuilder(),
+		cookieBuilder:       Cookie.NewCookieBuilder(),
 		cache:               cache,
 		oauthConfigProvider: config.NewGoogleOauthConfig(),
 		messageBus:          messageBus,
@@ -122,11 +122,12 @@ func (g *GoogleAuthService) handleGoogleCallback(w http.ResponseWriter, r *http.
 	}
 
 	proxyPassword := ""
-	_, userErr := g.userUseCases.GetByEmail(userInfo.Email)
+	userId := 0
+	user, userErr := g.userUseCases.GetByEmail(userInfo.Email)
 	if userErr != nil {
 		if strings.Contains(userErr.Error(), "user not found") {
 			normalizedUsername := valueobjects.NormalizeUsername(userInfo.Name)
-			newProxyPassword, createUserErr := g.createNewUser(normalizedUsername, userInfo.Email)
+			id, newProxyPassword, createUserErr := g.createNewUser(normalizedUsername, userInfo.Email)
 			if createUserErr != nil {
 				log.Printf("Failed to create new user: %s", createUserErr.Error())
 				http.Error(w, "failed to generate new user", http.StatusInternalServerError)
@@ -134,11 +135,14 @@ func (g *GoogleAuthService) handleGoogleCallback(w http.ResponseWriter, r *http.
 			}
 
 			proxyPassword = newProxyPassword
+			userId = id
 		} else {
 			log.Printf("Failed to fetch user: %s", userErr)
 			http.Error(w, "failed to fetch user", http.StatusInternalServerError)
 			return
 		}
+	} else {
+		userId = user.Id()
 	}
 
 	idToken, ok := token.Extra("id_token").(string)
@@ -148,6 +152,7 @@ func (g *GoogleAuthService) handleGoogleCallback(w http.ResponseWriter, r *http.
 	}
 
 	http.SetCookie(w, g.cookieBuilder.BuildCookie("/", "id_token", idToken, time.Hour))
+	http.SetCookie(w, g.cookieBuilder.BuildCookie("/", "user_id", fmt.Sprintf("%d", userId), time.Hour))
 	http.SetCookie(w, g.cookieBuilder.BuildCookie("/", "new_proxy_password", proxyPassword, time.Hour))
 	http.Redirect(w, r, "http://localhost:5173/dashboard", http.StatusTemporaryRedirect)
 }
@@ -206,7 +211,7 @@ func getPublicKey(certs *googleCerts, kid string) (*rsa.PublicKey, error) {
 	return nil, errors.New("no matching public key found")
 }
 
-func verifyIDToken(idToken string) (*jwt.Token, error) {
+func VerifyIDToken(idToken string) (*jwt.Token, error) {
 	certs, err := fetchGoogleCerts()
 	if err != nil {
 		return nil, err
@@ -232,10 +237,10 @@ func verifyIDToken(idToken string) (*jwt.Token, error) {
 	return token, nil
 }
 
-func (g *GoogleAuthService) createNewUser(name, email string) (proxyPassword string, err error) {
+func (g *GoogleAuthService) createNewUser(name, email string) (userId int, proxyPassword string, err error) {
 	password, passwordErr := g.createPassword(32)
 	if passwordErr != nil {
-		return "", fmt.Errorf("failed to register user - failed to create password: %s", passwordErr)
+		return 0, "", fmt.Errorf("failed to register user - failed to create password: %s", passwordErr)
 	}
 
 	postUserCommand := commands.PostUser{
@@ -243,22 +248,22 @@ func (g *GoogleAuthService) createNewUser(name, email string) (proxyPassword str
 		Password: password,
 		Email:    email,
 	}
-	_, createErr := g.userUseCases.Create(postUserCommand)
+	id, createErr := g.userUseCases.Create(postUserCommand)
 	if createErr != nil {
-		return "", fmt.Errorf("failed to register user - failed to create user: %s", createErr)
+		return 0, "", fmt.Errorf("failed to register user - failed to create user: %s", createErr)
 	}
 
-	return password.Value, nil
+	return id, password.Value, nil
 }
 
 func (g *GoogleAuthService) CheckAuthStatus(w http.ResponseWriter, r *http.Request) {
-	idToken, err := getIdTokenFromCookie(r)
+	idToken, err := GetIdTokenFromCookie(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	_, err = verifyIDToken(idToken)
+	_, err = VerifyIDToken(idToken)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -269,7 +274,7 @@ func (g *GoogleAuthService) CheckAuthStatus(w http.ResponseWriter, r *http.Reque
 	_ = json.NewEncoder(w).Encode(response)
 }
 
-func getIdTokenFromCookie(r *http.Request) (string, error) {
+func GetIdTokenFromCookie(r *http.Request) (string, error) {
 	cookie, err := r.Cookie("id_token")
 	if err != nil || cookie.Value == "" {
 		return "", errors.New("id_token not found in cookies")
@@ -278,13 +283,13 @@ func getIdTokenFromCookie(r *http.Request) (string, error) {
 }
 
 func (g *GoogleAuthService) GetUserInfo(w http.ResponseWriter, r *http.Request) {
-	idToken, err := getIdTokenFromCookie(r)
+	idToken, err := GetIdTokenFromCookie(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	verifiedToken, err := verifyIDToken(idToken)
+	verifiedToken, err := VerifyIDToken(idToken)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -318,13 +323,13 @@ type BasicCredentials struct {
 }
 
 func (g *GoogleAuthService) ResetPassword(w http.ResponseWriter, r *http.Request) {
-	idToken, err := getIdTokenFromCookie(r)
+	idToken, err := GetIdTokenFromCookie(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	verifiedToken, err := verifyIDToken(idToken)
+	verifiedToken, err := VerifyIDToken(idToken)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
