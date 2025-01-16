@@ -24,7 +24,10 @@ func (u *UserPasswordChangedEventHandler[T]) Handle(payload string) error {
 		log.Printf("failed to deserialize user password changed event: %s", deserializationErr)
 	}
 
-	_ = u.cache.Delete(userPasswordChangedEvent.Username)
+	deleteErr := u.cache.Delete(userPasswordChangedEvent.Username)
+	if deleteErr != nil {
+		log.Printf("UserPasswordChangedEvent handling: cache key was not removed: %s", deleteErr)
+	}
 
 	return nil
 }
