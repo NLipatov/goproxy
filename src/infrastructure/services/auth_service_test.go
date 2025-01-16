@@ -32,14 +32,14 @@ func (m *mockCryptoService) HashValue(string) (string, error) {
 }
 
 type mockCache struct {
-	data     map[string]validateResult
+	data     map[string]ValidateResult
 	ttl      map[string]time.Time
 	setCalls int
 	getCalls int
 }
 
 type noSetMockCache struct {
-	data     map[string]validateResult
+	data     map[string]ValidateResult
 	ttl      map[string]time.Time
 	setCalls int
 	getCalls int
@@ -47,12 +47,12 @@ type noSetMockCache struct {
 
 func newMockCache() *mockCache {
 	return &mockCache{
-		data: make(map[string]validateResult),
+		data: make(map[string]ValidateResult),
 		ttl:  make(map[string]time.Time),
 	}
 }
 
-func (mc *mockCache) Get(key string) (validateResult, error) {
+func (mc *mockCache) Get(key string) (ValidateResult, error) {
 	mc.getCalls++
 	if result, exists := mc.data[key]; exists {
 		if time.Now().Before(mc.ttl[key]) {
@@ -60,10 +60,10 @@ func (mc *mockCache) Get(key string) (validateResult, error) {
 		}
 		delete(mc.data, key)
 	}
-	return validateResult{}, errors.New("not found")
+	return ValidateResult{}, errors.New("not found")
 }
 
-func (mc *mockCache) Set(key string, value validateResult) error {
+func (mc *mockCache) Set(key string, value ValidateResult) error {
 	mc.setCalls++
 	mc.data[key] = value
 	return nil
@@ -79,7 +79,7 @@ func (mc *mockCache) Delete(key string) error {
 	return nil
 }
 
-func (mc *noSetMockCache) Get(key string) (validateResult, error) {
+func (mc *noSetMockCache) Get(key string) (ValidateResult, error) {
 	mc.getCalls++
 	if result, exists := mc.data[key]; exists {
 		if time.Now().Before(mc.ttl[key]) {
@@ -87,10 +87,10 @@ func (mc *noSetMockCache) Get(key string) (validateResult, error) {
 		}
 		delete(mc.data, key)
 	}
-	return validateResult{}, errors.New("not found")
+	return ValidateResult{}, errors.New("not found")
 }
 
-func (mc *noSetMockCache) Set(string, validateResult) error {
+func (mc *noSetMockCache) Set(string, ValidateResult) error {
 	return fmt.Errorf("no set mock cache failed to set to cache")
 }
 
@@ -320,7 +320,7 @@ func TestAuthorizeBasic_CacheError(t *testing.T) {
 	}
 
 	cache := &noSetMockCache{
-		data: make(map[string]validateResult),
+		data: make(map[string]ValidateResult),
 		ttl:  make(map[string]time.Time),
 	}
 

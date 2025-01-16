@@ -3,13 +3,14 @@ package main
 import (
 	"database/sql"
 	"goproxy/application"
-	"goproxy/builders"
 	"goproxy/dal"
 	"goproxy/dal/repositories"
 	"goproxy/domain"
+	"goproxy/domain/aggregates"
 	"goproxy/infrastructure"
 	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/dto"
+	"goproxy/infrastructure/eventhandlers"
 	"goproxy/infrastructure/restapi"
 	"goproxy/infrastructure/restapi/google_auth"
 	"goproxy/infrastructure/services"
@@ -64,12 +65,13 @@ func startGoogleAuthController() {
 		log.Fatal(err)
 	}
 
-	userRepositoryBuilder := builders.NewUserRepositoryBuilder()
-	userRepo, userRepoErr := userRepositoryBuilder.Build("user-repository-google-auth", domain.PROXY, cache, db)
-	if userRepoErr != nil {
-		log.Fatal(userRepoErr)
+	eventHandleErr := eventhandlers.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
+		ProcessEvents()
+	if eventHandleErr != nil {
+		log.Fatal(eventHandleErr)
 	}
 
+	userRepo := repositories.NewUserRepository(db, cache)
 	cryptoService := services.GetCryptoService()
 	userUseCases := application.NewUserUseCases(userRepo, cryptoService)
 	authService := google_auth.NewGoogleAuthService(userUseCases, cryptoService, messageBusService)
@@ -161,20 +163,25 @@ func startHttpProxy() {
 	}
 	kafkaConfig.GroupID = "proxy"
 
-	kafkaService, kafkaServiceErr := services.NewKafkaService(kafkaConfig)
-	if kafkaServiceErr != nil {
-		log.Fatal(kafkaServiceErr)
+	eventHandleErr := eventhandlers.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
+		ProcessEvents()
+	if eventHandleErr != nil {
+		log.Fatal(eventHandleErr)
 	}
 
-	userRepositoryBuilder := builders.NewUserRepositoryBuilder()
-	userRepo, userRepoErr := userRepositoryBuilder.Build("user-repository-proxy", domain.PROXY, cache, db)
-	if userRepoErr != nil {
-		log.Fatal(userRepoErr)
-	}
+	userRepo := repositories.NewUserRepository(db, cache)
 
 	userRestrictionService := services.NewUserRestrictionService()
 	cryptoService := services.GetCryptoService()
-	authService := services.NewAuthService(cryptoService, kafkaService)
+	authCache := services.NewMapCacheWithTTL[services.ValidateResult]()
+
+	authCacheEventHandlerErr := eventhandlers.NewUserPasswordChangedEventProcessor[services.ValidateResult](domain.PROXY, authCache).
+		ProcessEvents()
+	if authCacheEventHandlerErr != nil {
+		log.Fatal(eventHandleErr)
+	}
+
+	authService := services.NewAuthService(cryptoService, authCache)
 	authUseCases := application.NewAuthUseCases(authService, userRepo, userRestrictionService)
 
 	go userRestrictionService.ProcessEvents()
@@ -205,11 +212,13 @@ func startHttpRestApi() {
 		log.Fatal(err)
 	}
 
-	userRepositoryBuilder := builders.NewUserRepositoryBuilder()
-	userRepo, userRepoErr := userRepositoryBuilder.Build("user-repository-rest-api", domain.PROXY, cache, db)
-	if userRepoErr != nil {
-		log.Fatal(userRepoErr)
+	eventHandleErr := eventhandlers.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
+		ProcessEvents()
+	if eventHandleErr != nil {
+		log.Fatal(eventHandleErr)
 	}
+
+	userRepo := repositories.NewUserRepository(db, cache)
 
 	cryptoService := services.GetCryptoService()
 	useCases := application.NewUserUseCases(userRepo, cryptoService)
