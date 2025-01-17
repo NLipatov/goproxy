@@ -52,6 +52,11 @@ func (u *UserRepository) GetByUsername(username string) (aggregates.User, error)
 }
 
 func (u *UserRepository) GetById(id int) (aggregates.User, error) {
+	cachedUser, cachedUserErr := u.cache.Get(fmt.Sprintf("%v", id))
+	if cachedUserErr == nil {
+		return cachedUser, nil
+	}
+
 	var username string
 	var email string
 	var passwordHash string
@@ -72,10 +77,17 @@ func (u *UserRepository) GetById(id int) (aggregates.User, error) {
 		return aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
 	}
 
+	_ = u.cache.Set(fmt.Sprintf("%v", id), user)
+
 	return user, nil
 }
 
 func (u *UserRepository) GetByEmail(email string) (aggregates.User, error) {
+	cachedUser, cachedUserErr := u.cache.Get(email)
+	if cachedUserErr == nil {
+		return cachedUser, nil
+	}
+
 	var id int
 	var usernameResult string
 	var emailResult string
@@ -96,6 +108,8 @@ func (u *UserRepository) GetByEmail(email string) (aggregates.User, error) {
 	if userErr != nil {
 		return aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
 	}
+
+	_ = u.cache.Set(email, user)
 
 	return user, nil
 }

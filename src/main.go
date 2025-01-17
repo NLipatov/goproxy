@@ -10,14 +10,15 @@ import (
 	"goproxy/domain/aggregates"
 	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure"
-	"goproxy/infrastructure/api/api-http"
 	"goproxy/infrastructure/api/api-http/google_auth"
+	"goproxy/infrastructure/api/api-http/users"
 	"goproxy/infrastructure/api/api-ws"
 	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/eventhandlers"
 	"goproxy/infrastructure/services"
 	"log"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -205,9 +206,13 @@ func startHttpProxy() {
 }
 
 func startHttpRestApi() {
-	port := os.Getenv("HTTP_REST_API_PORT")
-	if port == "" {
+	strPort := os.Getenv("HTTP_REST_API_PORT")
+	if strPort == "" {
 		log.Fatalf("'HTTP_REST_API_PORT' env var must be set")
+	}
+	port, portErr := strconv.Atoi(strPort)
+	if portErr != nil {
+		log.Fatal(portErr)
 	}
 
 	db, err := dal.ConnectDB()
@@ -234,11 +239,8 @@ func startHttpRestApi() {
 	cryptoService := services.GetCryptoService()
 	useCases := application.NewUserUseCases(userRepo, cryptoService)
 
-	usersController := api_http.NewUsersController(useCases)
-	err = usersController.ServePort(port)
-	if err != nil {
-		log.Printf("Failed serving port: %v", err)
-	}
+	usersController := users.NewUsersController(useCases)
+	usersController.Listen(port)
 }
 
 func createBigcacheInstance() (repositories.BigCacheUserRepositoryCache, error) {

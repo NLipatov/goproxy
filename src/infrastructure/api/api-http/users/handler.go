@@ -1,10 +1,11 @@
-package api_http
+package users
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"goproxy/application"
+	"goproxy/domain/aggregates"
 	"goproxy/infrastructure/dto"
 	"io"
 	"log"
@@ -13,38 +14,11 @@ import (
 	"strings"
 )
 
-type UsersController struct {
+type Handler struct {
 	userUseCases application.UserUseCasesContract
 }
 
-func NewUsersController(useCases application.UserUseCasesContract) *UsersController {
-	return &UsersController{
-		userUseCases: useCases,
-	}
-}
-
-func (l *UsersController) ServePort(port string) error {
-	log.Printf("Users REST API is serving port %s", port)
-
-	http.HandleFunc("/users", l.handleUsers)
-
-	return http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
-}
-
-func (l *UsersController) handleUsers(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case "POST":
-		l.PostUser(w, r)
-	case "GET":
-		l.GetUser(w, r)
-	case "DELETE":
-		l.DeleteUser(w, r)
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
-}
-
-func (l *UsersController) PostUser(w http.ResponseWriter, r *http.Request) {
+func (l *Handler) PostUser(w http.ResponseWriter, r *http.Request) {
 	var cmd dto.PostUserCommand
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 512))
 	if err := decoder.Decode(&cmd); err != nil {
@@ -75,39 +49,49 @@ func (l *UsersController) PostUser(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(fmt.Sprintf("%d", id)))
 }
 
-func (l *UsersController) GetUser(w http.ResponseWriter, r *http.Request) {
-	id, err := getUserIdFromQuery(r)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	user, err := l.userUseCases.GetById(id)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			respondWithError(w, http.StatusNotFound, "user not found")
+func (l *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+	id, idErr := getUserIdFromQuery(r)
+	if idErr == nil {
+		user, err := l.userUseCases.GetById(id)
+		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				respondWithError(w, http.StatusNotFound, "user not found")
+				return
+			}
+			respondWithError(w, http.StatusInternalServerError, "")
 			return
 		}
-		respondWithError(w, http.StatusInternalServerError, "")
+
+		respondErr := respondWithUserDto(user, w)
+		if respondErr != nil {
+			respondWithError(w, http.StatusInternalServerError, "")
+		}
 		return
 	}
 
-	cmd := dto.FromUser(user)
-	serialized, err := json.Marshal(cmd)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "")
+	email, emailErr := getUserEmailFromQuery(r)
+	if emailErr == nil {
+		user, err := l.userUseCases.GetByEmail(email)
+		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				respondWithError(w, http.StatusNotFound, "user not found")
+				return
+			}
+			respondWithError(w, http.StatusInternalServerError, "")
+			return
+		}
+
+		respondErr := respondWithUserDto(user, w)
+		if respondErr != nil {
+			respondWithError(w, http.StatusInternalServerError, "")
+		}
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(serialized)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "")
-		return
-	}
+	respondWithError(w, http.StatusBadRequest, "either 'id' or 'email' must be provided")
 }
 
-func (l *UsersController) DeleteUser(w http.ResponseWriter, r *http.Request) {
+func (l *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	var cmd dto.DeleteUserCommand
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 512))
 	if err := decoder.Decode(&cmd); err != nil {
@@ -138,14 +122,41 @@ func (l *UsersController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 func getUserIdFromQuery(r *http.Request) (int, error) {
 	strId := r.URL.Query().Get("id")
 	if strId == "" {
-		return -1, errors.New("'id' query parameter is required")
+		return -1, errors.New("no 'id' query parameter specified")
 	}
 
 	id, err := strconv.Atoi(strId)
 	return id, err
 }
 
+func getUserEmailFromQuery(r *http.Request) (string, error) {
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		return "", errors.New("no 'email' query parameter specified")
+	}
+
+	return email, nil
+}
+
 func respondWithError(w http.ResponseWriter, statusCode int, message string) {
 	http.Error(w, message, statusCode)
 	log.Printf("%d: %s", statusCode, message)
+}
+
+func respondWithUserDto(user aggregates.User, w http.ResponseWriter) error {
+	cmd := dto.FromUser(user)
+	serialized, err := json.Marshal(cmd)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "")
+		return err
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_, err = w.Write(serialized)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "")
+		return err
+	}
+
+	return nil
 }
