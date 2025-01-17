@@ -14,7 +14,8 @@ import (
 	"goproxy/infrastructure/api/api-http/users"
 	"goproxy/infrastructure/api/api-ws"
 	"goproxy/infrastructure/config"
-	"goproxy/infrastructure/eventhandlers"
+	"goproxy/infrastructure/eventhandlers/UserConsumedTrafficEvent"
+	"goproxy/infrastructure/eventhandlers/UserPasswordChangedEvent"
 	"goproxy/infrastructure/services"
 	"log"
 	"os"
@@ -68,7 +69,7 @@ func startGoogleAuthController() {
 		log.Fatal(err)
 	}
 
-	eventHandleErr := eventhandlers.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
+	eventHandleErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
 		ProcessEvents()
 	if eventHandleErr != nil {
 		log.Fatal(eventHandleErr)
@@ -104,8 +105,7 @@ func startPlanController() {
 	planRepo := repositories.NewPlansRepository(db)
 	userPlanRepo := repositories.NewUserPlanRepository(db)
 
-	userConsumedTrafficEventProcessorErr := eventhandlers.
-		NewUserConsumedTrafficEventProcessor(trafficCache, userPlanRepo, planRepo, domain.PLAN).
+	userConsumedTrafficEventProcessorErr := UserConsumedTrafficEvent.NewUserConsumedTrafficEventProcessor(trafficCache, userPlanRepo, planRepo, domain.PLAN).
 		ProcessEvents()
 
 	if userConsumedTrafficEventProcessorErr != nil {
@@ -178,7 +178,7 @@ func startHttpProxy() {
 	}
 	kafkaConfig.GroupID = "proxy"
 
-	eventHandleErr := eventhandlers.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
+	eventHandleErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
 		ProcessEvents()
 	if eventHandleErr != nil {
 		log.Fatal(eventHandleErr)
@@ -190,7 +190,7 @@ func startHttpProxy() {
 	cryptoService := services.GetCryptoService()
 	authCache := services.NewMapCacheWithTTL[services.ValidateResult]()
 
-	authCacheEventHandlerErr := eventhandlers.NewUserPasswordChangedEventProcessor[services.ValidateResult](domain.PROXY, authCache).
+	authCacheEventHandlerErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[services.ValidateResult](domain.PROXY, authCache).
 		ProcessEvents()
 	if authCacheEventHandlerErr != nil {
 		log.Fatal(eventHandleErr)
@@ -231,7 +231,7 @@ func startHttpRestApi() {
 		log.Fatal(err)
 	}
 
-	eventHandleErr := eventhandlers.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
+	eventHandleErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
 		ProcessEvents()
 	if eventHandleErr != nil {
 		log.Fatal(eventHandleErr)

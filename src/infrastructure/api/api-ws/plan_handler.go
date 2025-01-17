@@ -100,7 +100,7 @@ func (w *WSHandler) ServeHTTP(wr http.ResponseWriter, r *http.Request) {
 				Name: plan.Name,
 				Limits: dto.Limits{
 					Bandwidth: dto.BandwidthLimit{
-						IsLimited: plan.Bandwidth > 1099511627776,
+						IsLimited: plan.Bandwidth != 0,
 						Used:      traffic,
 						Total:     plan.Bandwidth,
 					},
