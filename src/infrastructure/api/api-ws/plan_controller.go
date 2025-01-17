@@ -13,9 +13,9 @@ type PlanController struct {
 	corsManager CORS.CORSManager
 }
 
-func NewPlanController(userUseCases application.UserUseCases, userPlanInfoUseCases application.UserPlanInfoUseCases) *PlanController {
+func NewPlanController(userPlanInfoUseCases application.UserPlanInfoUseCases, usersApiHost string) *PlanController {
 	return &PlanController{
-		wsHandler:   NewWSHandler(userUseCases, userPlanInfoUseCases),
+		wsHandler:   NewWSHandler(userPlanInfoUseCases, usersApiHost),
 		corsManager: CORS.NewCORSManager(),
 	}
 }

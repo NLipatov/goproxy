@@ -1,9 +1,13 @@
 package api_ws
 
 import (
+	"encoding/json"
+	"fmt"
+	"goproxy/domain/dataobjects"
+	"goproxy/infrastructure/dto"
+	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -12,8 +16,10 @@ import (
 	"goproxy/infrastructure/api/api-http/google_auth"
 )
 
+const updateInterval = time.Second * 5
+
 type WSHandler struct {
-	userUseCases     application.UserUseCases
+	userApiHost      string
 	planInfoUseCases application.UserPlanInfoUseCases
 	upgrader         websocket.Upgrader
 	pingPeriod       time.Duration
@@ -22,9 +28,9 @@ type WSHandler struct {
 	maxMessageSize   int64
 }
 
-func NewWSHandler(userUseCases application.UserUseCases, planInfoUseCases application.UserPlanInfoUseCases) *WSHandler {
+func NewWSHandler(planInfoUseCases application.UserPlanInfoUseCases, usersApiHost string) *WSHandler {
 	return &WSHandler{
-		userUseCases:     userUseCases,
+		userApiHost:      usersApiHost,
 		planInfoUseCases: planInfoUseCases,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
@@ -60,32 +66,29 @@ func (w *WSHandler) ServeHTTP(wr http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 
-	userID, email, err := w.authenticateUser(r)
+	userId, err := w.authenticateUser(r)
 	if err != nil {
 		log.Printf("authentication error: %v", err)
 		_ = conn.WriteJSON(map[string]string{"error": err.Error()})
 		return
 	}
 
-	log.Printf("Usser authenticated: ID=%d, Email=%s", userID, email)
-
 	done := make(chan struct{})
 
 	go w.readPump(conn, done)
 
 	sendUserInfo := func() bool {
-		plan, err := w.planInfoUseCases.FetchUserPlan(userID)
-		if err != nil {
-			log.Printf("could not load user plan: %v", err)
-			_ = conn.WriteJSON(map[string]string{"error": "could not load plan info"})
-			return false
+		plan, planErr := w.planInfoUseCases.FetchUserPlan(userId)
+		if planErr != nil {
+			plan = dataobjects.UserPlan{
+				Name:      "N/A",
+				Bandwidth: 0,
+			}
 		}
 
-		traffic, err := w.planInfoUseCases.FetchTrafficUsage(userID)
-		if err != nil {
-			log.Printf("could not load traffic info: %v", err)
-			_ = conn.WriteJSON(map[string]string{"error": "could not load traffic info"})
-			return false
+		traffic, trafficErr := w.planInfoUseCases.FetchTrafficUsage(userId)
+		if trafficErr != nil {
+			traffic = 0
 		}
 
 		response := map[string]interface{}{
@@ -102,9 +105,7 @@ func (w *WSHandler) ServeHTTP(wr http.ResponseWriter, r *http.Request) {
 			},
 		}
 
-		log.Printf("sending data to user ID=%d", userID)
-		if err := conn.WriteJSON(response); err != nil {
-			log.Printf("could not send data to user: %v", err)
+		if writeJsonErr := conn.WriteJSON(response); writeJsonErr != nil {
 			return false
 		}
 		return true
@@ -118,7 +119,7 @@ func (w *WSHandler) ServeHTTP(wr http.ResponseWriter, r *http.Request) {
 	pingTicker := time.NewTicker(w.pingPeriod)
 	defer pingTicker.Stop()
 
-	updateTicker := time.NewTicker(3 * time.Second)
+	updateTicker := time.NewTicker(updateInterval)
 	defer updateTicker.Stop()
 
 	for {
@@ -147,51 +148,52 @@ func (w *WSHandler) ServeHTTP(wr http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (w *WSHandler) authenticateUser(r *http.Request) (int, string, error) {
+func (w *WSHandler) authenticateUser(r *http.Request) (int, error) {
 	idToken, err := google_auth.GetIdTokenFromCookie(r)
 	if err != nil {
-		return 0, "", err
+		return 0, err
 	}
 
 	verifiedToken, err := google_auth.VerifyIDToken(idToken)
 	if err != nil {
-		return 0, "", err
+		return 0, err
 	}
 
 	claims, ok := verifiedToken.Claims.(jwt.MapClaims)
 	if !ok {
-		return 0, "", err
+		return 0, err
 	}
 
 	email, ok := claims["email"].(string)
 	if !ok || email == "" {
-		return 0, "", err
+		return 0, err
 	}
 
-	userIdCookie, err := r.Cookie("user_id")
+	resp, err := http.Get(fmt.Sprintf("%s/users/get?email=%s", w.userApiHost, email))
 	if err != nil {
-		return 0, "", err
+		return 0, fmt.Errorf("failed to fetch user id: %v", err)
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	body, bodyErr := io.ReadAll(resp.Body)
+	if bodyErr != nil {
+		return 0, fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	userId, err := strconv.Atoi(userIdCookie.Value)
-	if err != nil {
-		return 0, "", err
+	var userResult dto.GetUserResult
+	deserializationErr := json.Unmarshal(body, &userResult)
+	if deserializationErr != nil {
+		return 0, fmt.Errorf("failed to deserialize user result: %v", deserializationErr)
 	}
 
-	return userId, email, nil
+	return userResult.Id, nil
 }
 
 func (w *WSHandler) readPump(conn *websocket.Conn, done chan struct{}) {
 	defer close(done)
 	for {
-		_, _, err := conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("unexpected closing WebSocket error: %v", err)
-			} else {
-				log.Printf("WebSocket read err: %v", err)
-			}
-			return
-		}
+		_, _, _ = conn.ReadMessage()
 	}
 }

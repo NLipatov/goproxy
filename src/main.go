@@ -83,6 +83,11 @@ func startGoogleAuthController() {
 }
 
 func startPlanController() {
+	usersRestApiHost := os.Getenv("USERS_API_HOST")
+	if usersRestApiHost == "" {
+		log.Fatalf("USERS_API_HOST environment variable not set")
+	}
+
 	db, err := dal.ConnectDB()
 	if err != nil {
 		log.Fatal(err)
@@ -119,9 +124,7 @@ func startPlanController() {
 
 	userRepo := repositories.NewUserRepository(db, bigCache)
 	userPlanInfoUseCases := application.NewUserPlanInfoUseCases(planRepo, userPlanRepo, userRepo, planCache, trafficCache)
-	cryptoService := services.GetCryptoService()
-	userUseCases := application.NewUserUseCases(userRepo, cryptoService)
-	planController := api_ws.NewPlanController(userUseCases, userPlanInfoUseCases)
+	planController := api_ws.NewPlanController(userPlanInfoUseCases, usersRestApiHost)
 	planController.Listen(3031)
 
 	for {

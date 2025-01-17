@@ -267,8 +267,11 @@ services:
     build:
       context: ./src
     container_name: plan-controller
+    ports:
+      - "3031:3031"
     environment:
       - MODE=plan-controller
+      - USERS_API_HOST=http://rest-api:80
       - DB_USER=${PLANS_DB_USER}
       - DB_PASS=${PLANS_DB_PASS}
       - DB_HOST=${PLANS_DB_HOST}
