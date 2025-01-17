@@ -121,28 +121,21 @@ func (g *GoogleAuthService) handleGoogleCallback(w http.ResponseWriter, r *http.
 		return
 	}
 
-	proxyPassword := ""
-	userId := 0
-	user, userErr := g.userUseCases.GetByEmail(userInfo.Email)
+	_, userErr := g.userUseCases.GetByEmail(userInfo.Email)
 	if userErr != nil {
 		if strings.Contains(userErr.Error(), "user not found") {
 			normalizedUsername := valueobjects.NormalizeUsername(userInfo.Name)
-			id, newProxyPassword, createUserErr := g.createNewUser(normalizedUsername, userInfo.Email)
+			_, createUserErr := g.createNewUser(normalizedUsername, userInfo.Email)
 			if createUserErr != nil {
 				log.Printf("Failed to create new user: %s", createUserErr.Error())
 				http.Error(w, "failed to generate new user", http.StatusInternalServerError)
 				return
 			}
-
-			proxyPassword = newProxyPassword
-			userId = id
 		} else {
 			log.Printf("Failed to fetch user: %s", userErr)
 			http.Error(w, "failed to fetch user", http.StatusInternalServerError)
 			return
 		}
-	} else {
-		userId = user.Id()
 	}
 
 	idToken, ok := token.Extra("id_token").(string)
@@ -152,8 +145,6 @@ func (g *GoogleAuthService) handleGoogleCallback(w http.ResponseWriter, r *http.
 	}
 
 	http.SetCookie(w, g.cookieBuilder.BuildCookie("/", "id_token", idToken, time.Hour))
-	http.SetCookie(w, g.cookieBuilder.BuildCookie("/", "user_id", fmt.Sprintf("%d", userId), time.Hour))
-	http.SetCookie(w, g.cookieBuilder.BuildCookie("/", "new_proxy_password", proxyPassword, time.Hour))
 	http.Redirect(w, r, "http://localhost:5173/dashboard", http.StatusTemporaryRedirect)
 }
 
@@ -237,10 +228,10 @@ func VerifyIDToken(idToken string) (*jwt.Token, error) {
 	return token, nil
 }
 
-func (g *GoogleAuthService) createNewUser(name, email string) (userId int, proxyPassword string, err error) {
+func (g *GoogleAuthService) createNewUser(name, email string) (proxyPassword string, err error) {
 	password, passwordErr := g.createPassword(32)
 	if passwordErr != nil {
-		return 0, "", fmt.Errorf("failed to register user - failed to create password: %s", passwordErr)
+		return "", fmt.Errorf("failed to register user - failed to create password: %s", passwordErr)
 	}
 
 	postUserCommand := commands.PostUser{
@@ -248,12 +239,12 @@ func (g *GoogleAuthService) createNewUser(name, email string) (userId int, proxy
 		Password: password,
 		Email:    email,
 	}
-	id, createErr := g.userUseCases.Create(postUserCommand)
+	_, createErr := g.userUseCases.Create(postUserCommand)
 	if createErr != nil {
-		return 0, "", fmt.Errorf("failed to register user - failed to create user: %s", createErr)
+		return "", fmt.Errorf("failed to register user - failed to create user: %s", createErr)
 	}
 
-	return id, password.Value, nil
+	return password.Value, nil
 }
 
 func (g *GoogleAuthService) CheckAuthStatus(w http.ResponseWriter, r *http.Request) {
