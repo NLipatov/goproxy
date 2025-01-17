@@ -277,7 +277,7 @@ func (g *GoogleAuthService) CheckAuthStatus(w http.ResponseWriter, r *http.Reque
 func GetIdTokenFromCookie(r *http.Request) (string, error) {
 	cookie, err := r.Cookie("id_token")
 	if err != nil || cookie.Value == "" {
-		return "", errors.New("id_token not found in cookies")
+		return "", errors.New("not authenticated")
 	}
 	return cookie.Value, nil
 }
