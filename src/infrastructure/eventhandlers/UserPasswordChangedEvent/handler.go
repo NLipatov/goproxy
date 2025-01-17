@@ -1,4 +1,4 @@
-package eventhandlers
+package UserPasswordChangedEvent
 
 import (
 	"encoding/json"
@@ -7,17 +7,17 @@ import (
 	"log"
 )
 
-type UserPasswordChangedEventHandler[T any] struct {
+type Handler[T any] struct {
 	cache application.Cache[T]
 }
 
 func NewUserPasswordChangedEventHandler[T any](cache application.Cache[T]) application.EventHandler {
-	return &UserPasswordChangedEventHandler[T]{
+	return &Handler[T]{
 		cache: cache,
 	}
 }
 
-func (u *UserPasswordChangedEventHandler[T]) Handle(payload string) error {
+func (u *Handler[T]) Handle(payload string) error {
 	var userPasswordChangedEvent events.UserPasswordChangedEvent
 	deserializationErr := json.Unmarshal([]byte(payload), &userPasswordChangedEvent)
 	if deserializationErr != nil {

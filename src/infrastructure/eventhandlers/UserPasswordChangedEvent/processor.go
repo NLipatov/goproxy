@@ -1,4 +1,4 @@
-package eventhandlers
+package UserPasswordChangedEvent
 
 import (
 	"context"
@@ -10,19 +10,19 @@ import (
 	"log"
 )
 
-type UserPasswordChangedEventProcessor[T any] struct {
+type Processor[T any] struct {
 	boundedContext domain.BoundedContexts
 	cache          application.Cache[T]
 }
 
-func NewUserPasswordChangedEventProcessor[T any](boundedContext domain.BoundedContexts, cache application.Cache[T]) *UserPasswordChangedEventProcessor[T] {
-	return &UserPasswordChangedEventProcessor[T]{
+func NewUserPasswordChangedEventProcessor[T any](boundedContext domain.BoundedContexts, cache application.Cache[T]) *Processor[T] {
+	return &Processor[T]{
 		boundedContext,
 		cache,
 	}
 }
 
-func (c *UserPasswordChangedEventProcessor[T]) ProcessEvents() error {
+func (c *Processor[T]) ProcessEvents() error {
 	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(c.boundedContext)
 	if kafkaConfigErr != nil {
 		return kafkaConfigErr

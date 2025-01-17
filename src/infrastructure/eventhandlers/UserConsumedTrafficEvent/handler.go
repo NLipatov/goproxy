@@ -1,4 +1,4 @@
-package eventhandlers
+package UserConsumedTrafficEvent
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-type UserConsumedTrafficEventHandler struct {
+type Handler struct {
 	cache              application.CacheWithTTL[dataobjects.UserTraffic]
 	userPlanRepository application.UserPlanRepository
 	planRepository     application.PlanRepository
@@ -26,7 +26,7 @@ func NewUserConsumedTrafficEventHandler(cache application.CacheWithTTL[dataobjec
 	userPlanRepository application.UserPlanRepository,
 	planRepository application.PlanRepository,
 	messageBus application.MessageBusService) application.EventHandler {
-	return &UserConsumedTrafficEventHandler{
+	return &Handler{
 		cache:              cache,
 		userPlanRepository: userPlanRepository,
 		planRepository:     planRepository,
@@ -34,7 +34,7 @@ func NewUserConsumedTrafficEventHandler(cache application.CacheWithTTL[dataobjec
 	}
 }
 
-func (u *UserConsumedTrafficEventHandler) Handle(payload string) error {
+func (u *Handler) Handle(payload string) error {
 	var event events.UserConsumedTrafficEvent
 	err := json.Unmarshal([]byte(payload), &event)
 	if err != nil {
@@ -67,7 +67,9 @@ func (u *UserConsumedTrafficEventHandler) Handle(payload string) error {
 		log.Printf("cache update err: %v", err)
 	}
 
-	if currentTraffic.OutBytes+currentTraffic.InBytes > currentTraffic.PlanLimitBytes {
+	// if PlanLimitBytes is 0 -> no limit applied
+	if currentTraffic.OutBytes+currentTraffic.InBytes > currentTraffic.PlanLimitBytes &&
+		currentTraffic.PlanLimitBytes > 0 {
 		produceErr := u.produceUserExceededTrafficLimitEvent(event.UserId)
 		if produceErr != nil {
 			log.Printf("could not produce user exceeded traffic limit event: %s", produceErr)
@@ -77,10 +79,10 @@ func (u *UserConsumedTrafficEventHandler) Handle(payload string) error {
 	return nil
 }
 
-func (u *UserConsumedTrafficEventHandler) cacheKey(userId int) string {
+func (u *Handler) cacheKey(userId int) string {
 	return fmt.Sprintf("user:%d:traffic", userId)
 }
-func (u *UserConsumedTrafficEventHandler) loadFromDB(userId int) (dataobjects.UserTraffic, error) {
+func (u *Handler) loadFromDB(userId int) (dataobjects.UserTraffic, error) {
 	activePlan, err := u.loadUserPlan(userId)
 	if err != nil {
 		return dataobjects.UserTraffic{}, err
@@ -101,7 +103,7 @@ func (u *UserConsumedTrafficEventHandler) loadFromDB(userId int) (dataobjects.Us
 	return userTraffic, nil
 }
 
-func (u *UserConsumedTrafficEventHandler) loadUserPlan(userId int) (aggregates.Plan, error) {
+func (u *Handler) loadUserPlan(userId int) (aggregates.Plan, error) {
 	userPlanRow, userPlanRowFetchErr := u.getUserActivePlan(userId)
 	if userPlanRowFetchErr != nil {
 		log.Printf("failed to get user active plan: %s", userPlanRowFetchErr)
@@ -116,7 +118,7 @@ func (u *UserConsumedTrafficEventHandler) loadUserPlan(userId int) (aggregates.P
 	return activePlan, nil
 }
 
-func (u *UserConsumedTrafficEventHandler) getUserActivePlan(userId int) (aggregates.UserPlan, error) {
+func (u *Handler) getUserActivePlan(userId int) (aggregates.UserPlan, error) {
 	plan, err := u.userPlanRepository.GetUserActivePlan(userId)
 	if err != nil {
 		return plan, err
@@ -125,7 +127,7 @@ func (u *UserConsumedTrafficEventHandler) getUserActivePlan(userId int) (aggrega
 	return plan, err
 }
 
-func (u *UserConsumedTrafficEventHandler) produceUserWithNoPlanEvent(userId int) error {
+func (u *Handler) produceUserWithNoPlanEvent(userId int) error {
 	userConsumedTrafficWithoutPlan := events.NewUserConsumedTrafficWithoutPlan(userId)
 	data, serializationErr := json.Marshal(userConsumedTrafficWithoutPlan)
 	if serializationErr != nil {
@@ -146,7 +148,7 @@ func (u *UserConsumedTrafficEventHandler) produceUserWithNoPlanEvent(userId int)
 	return nil
 }
 
-func (u *UserConsumedTrafficEventHandler) produceUserExceededTrafficLimitEvent(userId int) error {
+func (u *Handler) produceUserExceededTrafficLimitEvent(userId int) error {
 	userExceededTrafficLimit := events.NewUserExceededTrafficLimitEvent(userId)
 	data, serializationErr := json.Marshal(userExceededTrafficLimit)
 	if serializationErr != nil {

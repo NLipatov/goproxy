@@ -1,4 +1,4 @@
-package eventhandlers
+package UserConsumedTrafficEvent
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"log"
 )
 
-type UserConsumedTrafficEventProcessor struct {
+type Processor struct {
 	boundedContext     domain.BoundedContexts
 	cache              application.CacheWithTTL[dataobjects.UserTraffic]
 	userPlanRepository application.UserPlanRepository
@@ -22,7 +22,7 @@ type UserConsumedTrafficEventProcessor struct {
 func NewUserConsumedTrafficEventProcessor(cache application.CacheWithTTL[dataobjects.UserTraffic],
 	userPlanRepository application.UserPlanRepository,
 	planRepository application.PlanRepository,
-	boundedContext domain.BoundedContexts) *UserConsumedTrafficEventProcessor {
+	boundedContext domain.BoundedContexts) *Processor {
 
 	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(boundedContext)
 	if kafkaConfigErr != nil {
@@ -36,7 +36,7 @@ func NewUserConsumedTrafficEventProcessor(cache application.CacheWithTTL[dataobj
 		log.Fatal(kafkaErr)
 	}
 
-	return &UserConsumedTrafficEventProcessor{
+	return &Processor{
 		cache:              cache,
 		userPlanRepository: userPlanRepository,
 		planRepository:     planRepository,
@@ -44,7 +44,7 @@ func NewUserConsumedTrafficEventProcessor(cache application.CacheWithTTL[dataobj
 		messageBus:         kafka,
 	}
 }
-func (u *UserConsumedTrafficEventProcessor) ProcessEvents() error {
+func (u *Processor) ProcessEvents() error {
 	eventHandler := NewUserConsumedTrafficEventHandler(u.cache, u.userPlanRepository, u.planRepository, u.messageBus)
 	eventProcessor := application.NewEventProcessor(u.messageBus).
 		RegisterTopic(fmt.Sprintf("%s", u.boundedContext)).
