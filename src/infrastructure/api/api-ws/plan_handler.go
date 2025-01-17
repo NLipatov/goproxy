@@ -69,7 +69,11 @@ func (w *WSHandler) ServeHTTP(wr http.ResponseWriter, r *http.Request) {
 	userId, err := w.authenticateUser(r)
 	if err != nil {
 		log.Printf("authentication error: %v", err)
-		_ = conn.WriteJSON(map[string]string{"error": err.Error()})
+		_ = conn.WriteJSON(dto.ApiResponse[any]{
+			Payload:      nil,
+			ErrorCode:    401,
+			ErrorMessage: "Unauthorized",
+		})
 		return
 	}
 
@@ -91,20 +95,28 @@ func (w *WSHandler) ServeHTTP(wr http.ResponseWriter, r *http.Request) {
 			traffic = 0
 		}
 
-		response := map[string]interface{}{
-			"plan": map[string]interface{}{
-				"name": plan.Name,
-				"limits": map[string]interface{}{
-					"bandwidth": map[string]interface{}{
-						"used":  traffic,
-						"total": plan.Bandwidth,
+		response := dto.ApiResponse[dto.Plan]{
+			Payload: &dto.Plan{
+				Name: plan.Name,
+				Limits: dto.Limits{
+					Bandwidth: dto.BandwidthLimit{
+						IsLimited: plan.Bandwidth > 1099511627776,
+						Used:      traffic,
+						Total:     plan.Bandwidth,
 					},
-					"connections": 25,
-					"speed":       "unlimited",
+					Connections: dto.ConnectionLimit{
+						IsLimited:                true,
+						MaxConcurrentConnections: 25,
+					},
+					Speed: dto.SpeedLimit{
+						IsLimited:         false,
+						MaxBytesPerSecond: 0,
+					},
 				},
 			},
+			ErrorCode:    0,
+			ErrorMessage: "",
 		}
-
 		if writeJsonErr := conn.WriteJSON(response); writeJsonErr != nil {
 			return false
 		}
