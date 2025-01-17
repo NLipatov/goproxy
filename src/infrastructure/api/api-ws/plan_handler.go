@@ -194,6 +194,14 @@ func (w *WSHandler) authenticateUser(r *http.Request) (int, error) {
 func (w *WSHandler) readPump(conn *websocket.Conn, done chan struct{}) {
 	defer close(done)
 	for {
-		_, _, _ = conn.ReadMessage()
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("WebSocket read error: %v", err)
+			} else {
+				log.Printf("WebSocket connection closed: %v", err)
+			}
+			break
+		}
 	}
 }

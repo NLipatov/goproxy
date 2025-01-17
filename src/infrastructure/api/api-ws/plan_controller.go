@@ -21,7 +21,7 @@ func NewPlanController(userPlanInfoUseCases application.UserPlanInfoUseCases, us
 }
 
 func (pc PlanController) Listen(port int) {
-	http.Handle("/ws", pc.corsManager.AddCORS(pc.wsHandler))
+	http.Handle("/plans", pc.corsManager.AddCORS(pc.wsHandler))
 
 	log.Printf("WebSocket server is running on port %d", port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
