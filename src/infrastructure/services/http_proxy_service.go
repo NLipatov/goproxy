@@ -17,14 +17,16 @@ import (
 )
 
 type Proxy struct {
-	rateLimiter application.RateLimiterService
+	rateLimiter   application.RateLimiterService
+	dialerService application.DialerService
 }
 
-func NewProxy() *Proxy {
+func NewProxy(dialerService *DialerService) *Proxy {
 	rateLimiterConfig := config.LoadRateLimiterConfig()
 
 	return &Proxy{
-		rateLimiter: NewRateLimiter(rateLimiterConfig),
+		rateLimiter:   NewRateLimiter(rateLimiterConfig),
+		dialerService: dialerService,
 	}
 }
 
@@ -40,13 +42,13 @@ func (p *Proxy) Proxy(clientConn net.Conn, r *http.Request) {
 	}
 
 	if r.Method == http.MethodConnect {
-		p.handleHttps(clientConn, r, userID)
+		p.HandleHttps(clientConn, r, userID)
 	} else {
-		p.handleHttpConnection(clientConn, r, userID)
+		p.HandleHttp(clientConn, r, userID)
 	}
 }
 
-func (p *Proxy) handleHttps(clientConn net.Conn, r *http.Request, userId int) {
+func (p *Proxy) HandleHttps(clientConn net.Conn, r *http.Request, userId int) {
 	host := r.URL.Host
 	if !strings.Contains(host, ":") {
 		host += ":443"
@@ -57,7 +59,14 @@ func (p *Proxy) handleHttps(clientConn net.Conn, r *http.Request, userId int) {
 		return
 	}
 
-	serverConn, err := net.Dial("tcp", host)
+	dialer, dialerErr := p.dialerService.GetDialer("tcp", userId)
+	if dialerErr != nil {
+		log.Printf("Failed to get dialer: %v", dialerErr)
+		_, _ = clientConn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
+		return
+	}
+
+	serverConn, err := dialer.Dial("tcp", host)
 	if err != nil {
 		log.Println("Could not connect:", err)
 		_, _ = clientConn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
@@ -135,7 +144,7 @@ func (p *Proxy) copyTrafficAndReport(userId int, host string, dst io.Writer, src
 	}
 }
 
-func (p *Proxy) handleHttpConnection(clientConn net.Conn, firstReq *http.Request, userId int) {
+func (p *Proxy) HandleHttp(clientConn net.Conn, firstReq *http.Request, userId int) {
 	br := bufio.NewReader(clientConn)
 	req := firstReq
 
@@ -169,7 +178,14 @@ func (p *Proxy) handleHttpOnce(clientConn net.Conn, r *http.Request, userId int)
 		host += ":80"
 	}
 
-	serverConn, err := net.Dial("tcp", host)
+	dialer, dialerErr := p.dialerService.GetDialer("tcp", userId)
+	if dialerErr != nil {
+		log.Printf("Failed to get dialer: %v", dialerErr)
+		_, _ = clientConn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
+		return dialerErr
+	}
+
+	serverConn, err := dialer.Dial("tcp", host)
 	if err != nil {
 		log.Println("Could not connect:", err)
 		_, _ = clientConn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))

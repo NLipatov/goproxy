@@ -154,9 +154,14 @@ func applyMigrations() {
 }
 
 func startHttpProxy() {
-	port := os.Getenv("HTTP_LISTENER_PORT")
-	if port == "" {
+	strPort := os.Getenv("HTTP_LISTENER_PORT")
+	if strPort == "" {
 		log.Fatalf("'HTTP_LISTENER_PORT' env var must be set")
+	}
+
+	port, err := strconv.Atoi(strPort)
+	if err != nil {
+		log.Fatalf("failed to parse HTTP_LISTENER_PORT: %s", err)
 	}
 
 	db, err := dal.ConnectDB()
@@ -201,11 +206,11 @@ func startHttpProxy() {
 
 	go userRestrictionService.ProcessEvents()
 
-	listener := infrastructure.NewHttpListener(authUseCases)
-	err = listener.ServePort(port)
-	if err != nil {
-		log.Printf("Failed serving port: %v", err)
-	}
+	dialerService := services.NewDialerService()
+	proxy := services.NewProxy(dialerService)
+	listener := infrastructure.NewHttpListener()
+	proxyUseCases := application.NewProxyUseCases(proxy, listener, authUseCases)
+	proxyUseCases.ServeOnPort(port)
 }
 
 func startHttpRestApi() {
