@@ -3,31 +3,34 @@ package services
 import (
 	"context"
 	"errors"
-	"fmt"
 	"goproxy/application"
 	"goproxy/application/aplication_errors"
 	"log"
 	"math/rand"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 )
 
 type DialerPool struct {
-	ipPool    []net.IP
-	userCache application.CacheWithTTL[net.IP]
 	mu        sync.RWMutex
 	randGen   *rand.Rand
+	ipPool    []net.IP
+	dialers   map[string]*net.Dialer
+	userCache application.CacheWithTTL[net.IP]
 
 	// used to resolve new public IPs assigned to server
 	ipResolver application.IPResolver
 }
 
-func NewDialerPool() *DialerPool {
+func NewDialerPool(ipResolver application.IPResolver) *DialerPool {
 	return &DialerPool{
-		ipPool:    []net.IP{},
-		userCache: NewMapCacheWithTTL[net.IP](),
-		randGen:   rand.New(rand.NewSource(rand.Int63())),
+		ipPool:     []net.IP{},
+		dialers:    make(map[string]*net.Dialer),
+		userCache:  NewMapCacheWithTTL[net.IP](),
+		randGen:    rand.New(rand.NewSource(time.Now().UnixNano())),
+		ipResolver: ipResolver,
 	}
 }
 
@@ -42,20 +45,11 @@ func (dp *DialerPool) StartExploringNewPublicIps(ctx context.Context, interval t
 			case <-ticker.C:
 				ips, err := dp.ipResolver.GetHostPublicIPs()
 				if err != nil {
-					fmt.Printf("Failed to retrieve public IPs: %v\n", err)
+					log.Printf("Failed to retrieve public IPs: %v\n", err)
 					continue
 				}
-
-				log.Printf("Discovered %d public IP(s)", len(ips))
-				log.Printf("Public IPs: %v", ips)
-				dp.mu.Lock()
-				dp.ipPool = ips
-				dp.mu.Unlock()
-
-				fmt.Printf("Updated public IP pool: %v\n", ips)
-
+				dp.SetPool(ips)
 			case <-ctx.Done():
-				fmt.Println("Stopping public IP exploration")
 				return
 			}
 		}
@@ -67,7 +61,44 @@ func (dp *DialerPool) SetPool(ips []net.IP) {
 	defer dp.mu.Unlock()
 
 	dp.ipPool = ips
-	dp.userCache = NewMapCacheWithTTL[net.IP]()
+	dp.dialers = make(map[string]*net.Dialer, len(ips))
+
+	for _, ip := range ips {
+		ipStr := ip.String()
+		dp.dialers[ipStr] = &net.Dialer{
+			LocalAddr: &net.TCPAddr{IP: ip},
+		}
+	}
+}
+
+func (dp *DialerPool) GetDialer(_ string, userId int) (*net.Dialer, error) {
+	dp.mu.RLock()
+	empty := len(dp.ipPool) == 0
+	dp.mu.RUnlock()
+	if empty {
+		return nil, aplication_errors.ErrIpPoolEmpty{}
+	}
+
+	key := strconv.Itoa(userId)
+
+	cachedIP, err := dp.userCache.Get(key)
+	if err != nil {
+		dp.mu.RLock()
+		ip := dp.randomIPLocked()
+		dp.mu.RUnlock()
+
+		_ = dp.userCache.Set(key, ip)
+		_ = dp.userCache.Expire(key, 10*time.Minute)
+		cachedIP = ip
+	}
+
+	dp.mu.RLock()
+	dialer, ok := dp.dialers[cachedIP.String()]
+	dp.mu.RUnlock()
+	if !ok {
+		return nil, errors.New("failed to retrieve dialer for IP " + cachedIP.String())
+	}
+	return dialer, nil
 }
 
 func (dp *DialerPool) BindDialerToUser(userId int, ttl time.Duration) error {
@@ -75,55 +106,15 @@ func (dp *DialerPool) BindDialerToUser(userId int, ttl time.Duration) error {
 	defer dp.mu.Unlock()
 
 	if len(dp.ipPool) == 0 {
-		return errors.New("IP pool is empty")
+		return aplication_errors.ErrIpPoolEmpty{}
 	}
-
-	ip := dp.randomIP()
-	key := dp.toCacheKey(userId)
-
+	ip := dp.randomIPLocked()
+	key := strconv.Itoa(userId)
 	_ = dp.userCache.Set(key, ip)
 	_ = dp.userCache.Expire(key, ttl)
-
 	return nil
 }
 
-func (dp *DialerPool) GetDialer(network string, userId int) (*net.Dialer, error) {
-	dp.mu.RLock()
-	defer dp.mu.RUnlock()
-
-	if len(dp.ipPool) == 0 {
-		return nil, aplication_errors.IpPoolEmptyErr{}
-	}
-
-	var localIP net.IP
-	key := dp.toCacheKey(userId)
-
-	cachedIP, err := dp.userCache.Get(key)
-	if err == nil {
-		localIP = cachedIP
-	} else {
-		localIP = dp.randomIP()
-		_ = dp.userCache.Set(key, localIP)
-		_ = dp.userCache.Expire(key, 10*time.Minute)
-	}
-
-	var localAddr net.Addr
-	switch network {
-	case "tcp", "tcp4", "tcp6":
-		localAddr = &net.TCPAddr{IP: localIP}
-	case "udp", "udp4", "udp6":
-		localAddr = &net.UDPAddr{IP: localIP}
-	default:
-		return nil, errors.New("unsupported network protocol")
-	}
-
-	return &net.Dialer{LocalAddr: localAddr}, nil
-}
-
-func (dp *DialerPool) randomIP() net.IP {
+func (dp *DialerPool) randomIPLocked() net.IP {
 	return dp.ipPool[dp.randGen.Intn(len(dp.ipPool))]
-}
-
-func (dp *DialerPool) toCacheKey(userId int) string {
-	return fmt.Sprintf("%d", userId)
 }

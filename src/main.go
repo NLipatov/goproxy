@@ -206,7 +206,7 @@ func startHttpProxy() {
 
 	go userRestrictionService.ProcessEvents()
 
-	dialerPool := services.NewDialerPool()
+	dialerPool := services.NewDialerPool(services.NewIPResolver())
 	dialerPool.StartExploringNewPublicIps(context.Background(), time.Hour*8)
 	proxy := services.NewProxy(dialerPool)
 	listener := infrastructure.NewHttpListener(proxy)

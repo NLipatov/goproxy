@@ -15,20 +15,32 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 type Proxy struct {
-	rateLimiter   application.RateLimiterService
-	dialerService application.DialerPool
+	rateLimiter     application.RateLimiterService
+	dialerService   application.DialerPool
+	trafficReporter *TrafficReporter
+}
+
+var bufPool = sync.Pool{
+	New: func() any {
+		b := make([]byte, 32*1024)
+		return &b
+	},
 }
 
 func NewProxy(dialerService application.DialerPool) *Proxy {
 	rateLimiterConfig := config.LoadRateLimiterConfig()
+	trafficReporter, trafficReporterErr := NewTrafficReporter()
+	if trafficReporterErr != nil {
+		log.Fatalf("failed to create traffic reporterErr: %s", trafficReporterErr)
+	}
 
 	return &Proxy{
-		rateLimiter:   NewRateLimiter(rateLimiterConfig),
-		dialerService: dialerService,
+		rateLimiter:     NewRateLimiter(rateLimiterConfig),
+		dialerService:   dialerService,
+		trafficReporter: trafficReporter,
 	}
 }
 
@@ -37,16 +49,16 @@ func (p *Proxy) Proxy(clientConn net.Conn, r *http.Request) {
 		_ = clientConn.Close()
 	}(clientConn)
 
-	userID, err := strconv.Atoi(r.Header.Get("Proxy-Authorization"))
+	userId, err := strconv.Atoi(r.Header.Get("Proxy-Authorization"))
 	if err != nil {
 		log.Printf("Error parsing user id: %v", err)
 		return
 	}
 
 	if r.Method == http.MethodConnect {
-		p.HandleHttps(clientConn, r, userID)
+		p.HandleHttps(clientConn, r, userId)
 	} else {
-		p.HandleHttp(clientConn, r, userID)
+		p.HandleHttp(clientConn, r, userId)
 	}
 }
 
@@ -62,14 +74,12 @@ func (p *Proxy) HandleHttps(clientConn net.Conn, r *http.Request, userId int) {
 	}
 
 	dialer, dialerErr := p.dialerService.GetDialer("tcp", userId)
-	if dialerErr != nil {
-		if errors.Is(dialerErr, aplication_errors.IpPoolEmptyErr{}) {
-			dialer = &net.Dialer{
-				LocalAddr: &net.TCPAddr{},
-			}
-		} else {
-			log.Printf("failed to ge dialer: %s", dialerErr)
-		}
+	if dialerErr != nil && errors.Is(dialerErr, aplication_errors.ErrIpPoolEmpty{}) {
+		dialer = &net.Dialer{}
+	} else if dialerErr != nil {
+		log.Printf("failed to get dialer: %v", dialerErr)
+		_, _ = clientConn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
 	}
 
 	serverConn, err := dialer.Dial("tcp", host)
@@ -84,35 +94,33 @@ func (p *Proxy) HandleHttps(clientConn net.Conn, r *http.Request, userId int) {
 
 	_, _ = clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 
-	rep, repErr := p.newTrafficReporter(userId)
-	if repErr != nil {
-		log.Fatalf("failed to build traffic reporter: %s", repErr)
-	}
-
 	var wg sync.WaitGroup
 	wg.Add(2)
 
 	// client → server
 	go func() {
 		defer wg.Done()
-		_ = p.copyTrafficAndReport(userId, host, serverConn, clientConn, rep, "in")
+		_ = p.copyTrafficAndReport(userId, host, serverConn, clientConn, "in")
 	}()
 	// server → client
 	go func() {
 		defer wg.Done()
-		_ = p.copyTrafficAndReport(userId, host, clientConn, serverConn, rep, "out")
+		_ = p.copyTrafficAndReport(userId, host, clientConn, serverConn, "out")
 	}()
 
 	wg.Wait()
-	rep.SendFinal()
+	go p.trafficReporter.FlushBuckets()
 }
 
-func (p *Proxy) copyTrafficAndReport(userId int, host string, dst io.Writer, src io.Reader, tr *TrafficReporter, direction string) error {
+func (p *Proxy) copyTrafficAndReport(userId int, host string, dst io.Writer, src io.Reader, direction string) error {
 	if direction == "in" {
 		defer p.rateLimiter.Done(userId, host)
 	}
 
-	buf := make([]byte, 32*1024)
+	bufPtr := bufPool.Get().(*[]byte)
+	buf := *bufPtr
+	defer bufPool.Put(bufPtr)
+
 	var accumulatedBytes int64
 	const threshold = 1_000_000
 
@@ -136,9 +144,9 @@ func (p *Proxy) copyTrafficAndReport(userId int, host string, dst io.Writer, src
 			// direction == "in" → client→server
 			// direction == "out" → server→client
 			if direction == "in" {
-				tr.AddInBytes(int64(written))
+				p.trafficReporter.AddInBytes(userId, int64(written))
 			} else {
-				tr.AddOutBytes(int64(written))
+				p.trafficReporter.AddOutBytes(userId, int64(written))
 			}
 		}
 		if readErr != nil {
@@ -201,11 +209,6 @@ func (p *Proxy) handleHttpOnce(clientConn net.Conn, r *http.Request, userId int)
 		_ = serverConn.Close()
 	}(serverConn)
 
-	rep, repErr := p.newTrafficReporter(userId)
-	if repErr != nil {
-		log.Fatalf("failed to build traffic reporter: %s", repErr)
-	}
-
 	pr, pw := io.Pipe()
 	go func() {
 		_ = r.Write(pw)
@@ -213,25 +216,17 @@ func (p *Proxy) handleHttpOnce(clientConn net.Conn, r *http.Request, userId int)
 	}()
 
 	// Request: PipeReader→serverConn (inBytes)
-	copyRequestErr := p.copyTrafficAndReport(userId, host, serverConn, pr, rep, "in")
+	copyRequestErr := p.copyTrafficAndReport(userId, host, serverConn, pr, "in")
 	if copyRequestErr != nil {
 		return fmt.Errorf("copy request error: %w", copyRequestErr)
 	}
 
 	// Response: serverConn→clientConn (outBytes)
-	copyResponseError := p.copyTrafficAndReport(userId, host, clientConn, serverConn, rep, "out")
+	copyResponseError := p.copyTrafficAndReport(userId, host, clientConn, serverConn, "out")
 	if copyResponseError != nil {
 		return fmt.Errorf("copy response error: %w", copyResponseError)
 	}
 
-	rep.SendFinal()
+	go p.trafficReporter.FlushBuckets()
 	return nil
-}
-
-func (p *Proxy) newTrafficReporter(userId int) (*TrafficReporter, error) {
-	return NewTrafficReporter(
-		userId,
-		1*1024*1024,
-		5*time.Second,
-	)
 }

@@ -9,23 +9,22 @@ import (
 	"goproxy/infrastructure/config"
 	"log"
 	"sync"
-	"sync/atomic"
-	"time"
 )
 
 type TrafficReporter struct {
-	userId         int
-	inBytes        int64
-	outBytes       int64
-	thresholdBytes int64
-	interval       time.Duration
-
-	mu         sync.Mutex
-	lastSent   time.Time
-	messageBus application.MessageBusService
+	mu              sync.RWMutex
+	buckets         map[int]*TrafficBucket
+	messageBus      application.MessageBusService
+	eventQueue      chan events.UserConsumedTrafficEvent
+	stopEventWorker chan struct{}
 }
 
-func NewTrafficReporter(userId int, threshold int64, interval time.Duration) (*TrafficReporter, error) {
+type TrafficBucket struct {
+	InBytes  int64
+	OutBytes int64
+}
+
+func NewTrafficReporter() (*TrafficReporter, error) {
 	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(domain.PROXY)
 	if kafkaConfigErr != nil {
 		log.Fatalf("Error creating kafka config: %v", kafkaConfigErr)
@@ -36,69 +35,89 @@ func NewTrafficReporter(userId int, threshold int64, interval time.Duration) (*T
 		return nil, err
 	}
 
-	return &TrafficReporter{
-		userId:         userId,
-		thresholdBytes: threshold,
-		interval:       interval,
-		lastSent:       time.Now().UTC(),
-		messageBus:     messageBusService,
-	}, nil
-}
-
-func (tr *TrafficReporter) AddInBytes(n int64) {
-	if n == 0 {
-		return
+	reporter := &TrafficReporter{
+		buckets:         make(map[int]*TrafficBucket),
+		messageBus:      messageBusService,
+		eventQueue:      make(chan events.UserConsumedTrafficEvent, 100), // Буфер для очереди событий
+		stopEventWorker: make(chan struct{}),
 	}
-	atomic.AddInt64(&tr.inBytes, n)
-	tr.checkAndSend()
+
+	go reporter.startEventWorker()
+	return reporter, nil
 }
 
-func (tr *TrafficReporter) AddOutBytes(n int64) {
-	if n == 0 {
-		return
-	}
-	atomic.AddInt64(&tr.outBytes, n)
-	tr.checkAndSend()
-}
-
-func (tr *TrafficReporter) checkAndSend() {
+func (tr *TrafficReporter) AddInBytes(userId int, n int64) {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
 
-	in := atomic.LoadInt64(&tr.inBytes)
-	out := atomic.LoadInt64(&tr.outBytes)
-
-	if in+out >= tr.thresholdBytes || time.Since(tr.lastSent) >= tr.interval {
-		tr.SendIntermediate(in, out)
-	}
-}
-
-func (tr *TrafficReporter) SendIntermediate(in, out int64) {
-	if in == 0 && out == 0 {
-		tr.lastSent = time.Now().UTC()
+	if n == 0 {
 		return
 	}
-	_ = tr.ProduceTrafficConsumedEvent(in, out)
+	bucket, exists := tr.buckets[userId]
+	if !exists {
+		bucket = &TrafficBucket{}
+		tr.buckets[userId] = bucket
+	}
 
-	atomic.StoreInt64(&tr.inBytes, 0)
-	atomic.StoreInt64(&tr.outBytes, 0)
-	tr.lastSent = time.Now().UTC()
+	bucket.InBytes += n
 }
 
-func (tr *TrafficReporter) SendFinal() {
+func (tr *TrafficReporter) AddOutBytes(userId int, n int64) {
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
 
-	in := atomic.LoadInt64(&tr.inBytes)
-	out := atomic.LoadInt64(&tr.outBytes)
-	if in == 0 && out == 0 {
-		return
+	bucket, exists := tr.buckets[userId]
+	if !exists {
+		bucket = &TrafficBucket{}
+		tr.buckets[userId] = bucket
 	}
-	_ = tr.ProduceTrafficConsumedEvent(in, out)
+	bucket.OutBytes += n
+}
+func (tr *TrafficReporter) startEventWorker() {
+	for {
+		select {
+		case event := <-tr.eventQueue:
+			eventJson, err := json.Marshal(event)
+			if err != nil {
+				log.Printf("Failed to serialize event: %v", err)
+				continue
+			}
+
+			outboxEvent, err := events.NewOutboxEvent(0, string(eventJson), false, "UserConsumedTrafficEvent")
+			if err != nil {
+				log.Printf("Failed to create outbox event: %v", err)
+				continue
+			}
+
+			if err := tr.messageBus.Produce(fmt.Sprintf("%s", domain.PLAN), outboxEvent); err != nil {
+				log.Printf("Failed to produce event: %v", err)
+			}
+		case <-tr.stopEventWorker:
+			return
+		}
+	}
 }
 
-func (tr *TrafficReporter) ProduceTrafficConsumedEvent(in, out int64) error {
-	event := events.NewUserConsumedTrafficEvent(tr.userId, in, out)
+func (tr *TrafficReporter) FlushBuckets() {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+
+	for userId, bucket := range tr.buckets {
+		if bucket.InBytes > 0 || bucket.OutBytes > 0 {
+			tr.eventQueue <- events.NewUserConsumedTrafficEvent(userId, bucket.InBytes, bucket.OutBytes)
+			bucket.InBytes = 0
+			bucket.OutBytes = 0
+		}
+	}
+}
+
+func (tr *TrafficReporter) Stop() {
+	close(tr.stopEventWorker)
+	close(tr.eventQueue)
+}
+
+func (tr *TrafficReporter) ProduceTrafficConsumedEvent(userId int, in, out int64) error {
+	event := events.NewUserConsumedTrafficEvent(userId, in, out)
 	eventJson, serializationErr := json.Marshal(event)
 	if serializationErr != nil {
 		log.Printf("Could not serialize consumed traffic event: %v", serializationErr)

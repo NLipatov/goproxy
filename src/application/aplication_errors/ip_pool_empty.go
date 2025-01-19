@@ -1,8 +1,8 @@
 package aplication_errors
 
-type IpPoolEmptyErr struct {
+type ErrIpPoolEmpty struct {
 }
 
-func (ip IpPoolEmptyErr) Error() string {
+func (ip ErrIpPoolEmpty) Error() string {
 	return "IP pool is empty"
 }
