@@ -25,7 +25,7 @@ type Proxy struct {
 
 var bufPool = sync.Pool{
 	New: func() any {
-		b := make([]byte, 65535)
+		b := make([]byte, 1024*1024)
 		return &b
 	},
 }
