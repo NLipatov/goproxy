@@ -2,8 +2,10 @@ package services
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"goproxy/application"
+	"goproxy/application/aplication_errors"
 	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/infraerrs"
 	"io"
@@ -18,10 +20,10 @@ import (
 
 type Proxy struct {
 	rateLimiter   application.RateLimiterService
-	dialerService application.DialerService
+	dialerService application.DialerPool
 }
 
-func NewProxy(dialerService *DialerService) *Proxy {
+func NewProxy(dialerService application.DialerPool) *Proxy {
 	rateLimiterConfig := config.LoadRateLimiterConfig()
 
 	return &Proxy{
@@ -61,9 +63,13 @@ func (p *Proxy) HandleHttps(clientConn net.Conn, r *http.Request, userId int) {
 
 	dialer, dialerErr := p.dialerService.GetDialer("tcp", userId)
 	if dialerErr != nil {
-		log.Printf("Failed to get dialer: %v", dialerErr)
-		_, _ = clientConn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
-		return
+		if errors.Is(dialerErr, aplication_errors.IpPoolEmptyErr{}) {
+			dialer = &net.Dialer{
+				LocalAddr: &net.TCPAddr{},
+			}
+		} else {
+			log.Printf("failed to ge dialer: %s", dialerErr)
+		}
 	}
 
 	serverConn, err := dialer.Dial("tcp", host)
