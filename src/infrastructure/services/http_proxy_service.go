@@ -124,27 +124,37 @@ func (p *Proxy) copyTrafficAndReport(userId int, host string, dst io.Writer, src
 	var accumulatedBytes int64
 	const threshold = 1_000_000
 
-	written, err := io.CopyBuffer(dst, src, buf)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return err
-	}
-
-	// direction == "in" → client → server
-	// direction == "out" → server → client
-	if direction == "in" {
-		accumulatedBytes += written
-		if accumulatedBytes >= threshold {
-			if !p.rateLimiter.Allow(userId, host, accumulatedBytes) {
-				return infraerrs.RateLimitExceededError{}
+	for {
+		n, readErr := src.Read(buf)
+		if n > 0 {
+			written, writeErr := dst.Write(buf[:n])
+			if writeErr != nil {
+				return writeErr
 			}
-			accumulatedBytes = 0
-		}
-		p.trafficReporter.AddInBytes(userId, written)
-	} else {
-		p.trafficReporter.AddOutBytes(userId, written)
-	}
 
-	return nil
+			// direction == "in" → client → server
+			// direction == "out" → server → client
+			if direction == "in" {
+				accumulatedBytes += int64(written)
+				if accumulatedBytes >= threshold {
+					if !p.rateLimiter.Allow(userId, host, accumulatedBytes) {
+						return infraerrs.RateLimitExceededError{}
+					}
+					accumulatedBytes = 0
+				}
+				p.trafficReporter.AddInBytes(userId, int64(written))
+			} else {
+				p.trafficReporter.AddOutBytes(userId, int64(written))
+			}
+		}
+
+		if readErr != nil {
+			if readErr == io.EOF {
+				return nil
+			}
+			return readErr
+		}
+	}
 }
 
 func (p *Proxy) HandleHttp(clientConn net.Conn, firstReq *http.Request, userId int) {
