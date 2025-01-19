@@ -68,8 +68,11 @@ func (u *Handler) Handle(payload string) error {
 	}
 
 	// if PlanLimitBytes is 0 -> no limit applied
-	if currentTraffic.OutBytes+currentTraffic.InBytes > currentTraffic.PlanLimitBytes &&
-		currentTraffic.PlanLimitBytes > 0 {
+	if currentTraffic.PlanLimitBytes == 0 {
+		return nil
+	}
+
+	if currentTraffic.OutBytes+currentTraffic.InBytes > currentTraffic.PlanLimitBytes {
 		produceErr := u.produceUserExceededTrafficLimitEvent(event.UserId)
 		if produceErr != nil {
 			log.Printf("could not produce user exceeded traffic limit event: %s", produceErr)
