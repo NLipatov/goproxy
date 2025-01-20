@@ -3,10 +3,8 @@ package application
 import (
 	"bufio"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"goproxy/domain/valueobjects"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -71,17 +69,7 @@ func (p *ProxyUseCases) handleConnection(clientConn net.Conn) {
 	for {
 		request, err := http.ReadRequest(reader)
 		if err != nil {
-			//if client closed connection
-			if err != io.EOF {
-				return
-			}
-
-			// if error is critical
-			if errors.Is(err, io.ErrUnexpectedEOF) {
-				return
-			}
-
-			continue
+			return
 		}
 
 		if err := p.HandleAuthorization(clientConn, request); err != nil {
