@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+const defaultRotationRecordTTL = time.Minute
+
 type DialerPool struct {
 	mu        sync.RWMutex
 	randGen   *rand.Rand
@@ -90,7 +92,7 @@ func (dp *DialerPool) GetDialer(_ string, userId int) (*net.Dialer, error) {
 		dp.mu.RUnlock()
 
 		_ = dp.userCache.Set(key, ip)
-		_ = dp.userCache.Expire(key, 10*time.Minute)
+		_ = dp.userCache.Expire(key, defaultRotationRecordTTL)
 		cachedIP = ip
 	}
 
