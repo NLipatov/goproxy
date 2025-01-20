@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"goproxy/application"
@@ -42,7 +43,7 @@ func NewTrafficReporter() (*TrafficReporter, error) {
 		stopEventWorker: make(chan struct{}),
 	}
 
-	go reporter.startEventWorker()
+	go reporter.startEventWorker(context.Background())
 	return reporter, nil
 }
 
@@ -73,9 +74,11 @@ func (tr *TrafficReporter) AddOutBytes(userId int, n int64) {
 	}
 	bucket.OutBytes += n
 }
-func (tr *TrafficReporter) startEventWorker() {
+func (tr *TrafficReporter) startEventWorker(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case event := <-tr.eventQueue:
 			eventJson, err := json.Marshal(event)
 			if err != nil {

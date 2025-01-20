@@ -135,6 +135,7 @@ func (u *UserRepository) Update(user aggregates.User) error {
 		return fmt.Errorf("no rows updated for user plan id: %d", user.Id())
 	}
 
+	_ = u.cache.Delete(fmt.Sprintf("%v", user.Id()))
 	return nil
 }
 

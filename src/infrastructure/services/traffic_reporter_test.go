@@ -1,115 +1,134 @@
 package services
 
 import (
-	"errors"
-	"fmt"
-	"goproxy/domain"
-	"sync/atomic"
+	"context"
+	"encoding/json"
+	"goproxy/application/mocks"
+	"goproxy/domain/events"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
-func TestTrafficReporter_AddInBytes(t *testing.T) {
-	mockBus := new(MockMessageBusService)
-	mockBus.On("Produce", mock.Anything, mock.Anything).Return(nil)
-
+func TestNewTrafficReporter(t *testing.T) {
+	mockBus := mocks.NewMockMessageBusService()
 	reporter := &TrafficReporter{
-		userId:         1,
-		thresholdBytes: 10,
-		interval:       time.Hour,
-		messageBus:     mockBus,
-		lastSent:       time.Now().UTC(),
-	}
-
-	// Increase incoming bytes counter by less than threshold.
-	// This should not trigger a flushing send logic, so incoming bytes counter must not be flushed.
-	reporter.AddInBytes(reporter.thresholdBytes - 1)
-	assert.Equal(t, reporter.thresholdBytes-1, atomic.LoadInt64(&reporter.inBytes))
-
-	// Increase incoming bytes counter again
-	// This should trigger a flushing send logic, so incoming bytes counter must be flushed.
-	reporter.AddInBytes(reporter.thresholdBytes)
-	assert.Equal(t, int64(0), atomic.LoadInt64(&reporter.inBytes))
-
-	// should send event
-	mockBus.AssertCalled(t, "Produce", fmt.Sprintf("%s", domain.PLAN), mock.Anything)
-}
-
-func TestTrafficReporter_AddOutBytes(t *testing.T) {
-	mockBus := new(MockMessageBusService)
-	mockBus.On("Produce", mock.Anything, mock.Anything).Return(nil)
-
-	reporter := &TrafficReporter{
-		userId:         1,
-		thresholdBytes: 10,
-		interval:       time.Hour,
-		messageBus:     mockBus,
-		lastSent:       time.Now().UTC(),
-	}
-
-	// Increase incoming bytes counter by less than threshold.
-	// This should not trigger a flushing send logic, so incoming bytes counter must not be flushed.
-	reporter.AddOutBytes(reporter.thresholdBytes - 1)
-	assert.Equal(t, reporter.thresholdBytes-1, atomic.LoadInt64(&reporter.outBytes))
-
-	// Increase outgoing bytes counter again
-	// This should trigger a flushing send logic, so outgoing bytes counter must be flushed.
-	reporter.AddOutBytes(reporter.thresholdBytes)
-	assert.Equal(t, int64(0), atomic.LoadInt64(&reporter.outBytes))
-
-	// should send event
-	mockBus.AssertCalled(t, "Produce", fmt.Sprintf("%s", domain.PLAN), mock.Anything)
-}
-
-func TestTrafficReporter_SendIntermediate(t *testing.T) {
-	mockBus := new(MockMessageBusService)
-	mockBus.On("Produce", fmt.Sprintf("%s", domain.PLAN), mock.Anything).Return(nil)
-
-	reporter := &TrafficReporter{
-		userId:     1,
-		messageBus: mockBus,
-		lastSent:   time.Now().UTC().Add(-time.Minute),
-	}
-	reporter.AddInBytes(100)
-	reporter.AddOutBytes(200)
-
-	// will trigger counters flush and event producing
-	reporter.SendIntermediate(100, 200)
-	// was event produced?
-	mockBus.AssertCalled(t, "Produce", fmt.Sprintf("%s", domain.PLAN), mock.Anything)
-	// was counters flushed?
-	assert.Equal(t, int64(0), atomic.LoadInt64(&reporter.outBytes))
-	assert.Equal(t, int64(0), atomic.LoadInt64(&reporter.inBytes))
-
-}
-
-func TestTrafficReporter_ProduceTrafficConsumedEvent(t *testing.T) {
-	mockBus := new(MockMessageBusService)
-	mockBus.On("Produce", fmt.Sprintf("%s", domain.PLAN), mock.Anything).Return(nil)
-
-	reporter := &TrafficReporter{
-		userId:     1,
+		buckets:    make(map[int]*TrafficBucket),
 		messageBus: mockBus,
 	}
 
-	err := reporter.ProduceTrafficConsumedEvent(100, 200)
-	assert.NoError(t, err)
-	mockBus.AssertCalled(t, "Produce", fmt.Sprintf("%s", domain.PLAN), mock.Anything)
+	if reporter == nil {
+		t.Fatal("TrafficReporter is nil")
+	}
+	if reporter.messageBus == nil {
+		t.Fatal("MessageBusService is nil")
+	}
 }
 
-func TestTrafficReporter_ProduceTrafficConsumedEvent_Error(t *testing.T) {
-	mockBus := new(MockMessageBusService)
-	mockBus.On("Produce", mock.Anything, mock.Anything).Return(errors.New("produce error"))
-
+func TestAddInBytesAndOutBytes(t *testing.T) {
 	reporter := &TrafficReporter{
-		userId:     1,
+		buckets: make(map[int]*TrafficBucket),
+	}
+
+	reporter.AddInBytes(1, 100)
+	reporter.AddOutBytes(1, 200)
+
+	if reporter.buckets[1].InBytes != 100 {
+		t.Errorf("Expected InBytes to be 100, got %d", reporter.buckets[1].InBytes)
+	}
+	if reporter.buckets[1].OutBytes != 200 {
+		t.Errorf("Expected OutBytes to be 200, got %d", reporter.buckets[1].OutBytes)
+	}
+}
+
+func TestFlushbuckets(t *testing.T) {
+	testCtx, testCtxCancelFunc := context.WithCancel(context.Background())
+	mockBus := mocks.NewMockMessageBusService()
+	reporter := &TrafficReporter{
+		buckets:    make(map[int]*TrafficBucket),
+		eventQueue: make(chan events.UserConsumedTrafficEvent, 10),
 		messageBus: mockBus,
 	}
 
-	err := reporter.ProduceTrafficConsumedEvent(100, 200)
-	assert.Error(t, err)
-	mockBus.AssertCalled(t, "Produce", fmt.Sprintf("%s", domain.PLAN), mock.Anything)
+	go reporter.startEventWorker(testCtx)
+
+	reporter.AddInBytes(1, 500)
+	reporter.FlushBuckets()
+
+	// wait for mockBus to process event queue
+	time.Sleep(5 * time.Millisecond)
+
+	event, err := mockBus.Consume()
+	if err != nil {
+		t.Fatalf("Failed to consume event: %v", err)
+	}
+	testCtxCancelFunc()
+
+	if event == nil {
+		t.Fatal("Expected event, got nil")
+	}
+	var consumedEvent events.UserConsumedTrafficEvent
+	err = json.Unmarshal([]byte(event.Payload), &consumedEvent)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal event: %v", err)
+	}
+
+	if consumedEvent.InBytes != 500 {
+		t.Errorf("Expected InBytes to be 500, got %d", consumedEvent.InBytes)
+	}
+}
+
+func TestProduceTrafficConsumedEvent(t *testing.T) {
+	mockBus := mocks.NewMockMessageBusService()
+	reporter := &TrafficReporter{
+		messageBus: mockBus,
+	}
+
+	err := reporter.ProduceTrafficConsumedEvent(1, 100, 200)
+	if err != nil {
+		t.Fatalf("Failed to produce traffic event: %v", err)
+	}
+
+	event, err := mockBus.Consume()
+	if err != nil {
+		t.Fatalf("Failed to consume event: %v", err)
+	}
+
+	if event == nil {
+		t.Fatal("Expected event, got nil")
+	}
+
+	var consumedEvent events.UserConsumedTrafficEvent
+	err = json.Unmarshal([]byte(event.Payload), &consumedEvent)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal event: %v", err)
+	}
+
+	if consumedEvent.UserId != 1 {
+		t.Errorf("Expected UserId to be 1, got %d", consumedEvent.UserId)
+	}
+	if consumedEvent.InBytes != 100 {
+		t.Errorf("Expected InBytes to be 100, got %d", consumedEvent.InBytes)
+	}
+	if consumedEvent.OutBytes != 200 {
+		t.Errorf("Expected OutBytes to be 200, got %d", consumedEvent.OutBytes)
+	}
+}
+
+func TestStop(t *testing.T) {
+	reporter := &TrafficReporter{
+		stopEventWorker: make(chan struct{}),
+		eventQueue:      make(chan events.UserConsumedTrafficEvent),
+	}
+
+	go reporter.Stop()
+
+	// wait for goroutine to call stop
+	time.Sleep(1 * time.Millisecond)
+
+	select {
+	case <-reporter.stopEventWorker:
+		// Success
+	default:
+		t.Error("Stop did not close stopEventWorker channel")
+	}
 }
