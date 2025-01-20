@@ -76,7 +76,9 @@ func (dp *DialerPool) GetDialer(_ string, userId int) (*net.Dialer, error) {
 	empty := len(dp.ipPool) == 0
 	dp.mu.RUnlock()
 	if empty {
-		return nil, aplication_errors.ErrIpPoolEmpty{}
+		return &net.Dialer{
+			LocalAddr: &net.TCPAddr{},
+		}, nil
 	}
 
 	key := strconv.Itoa(userId)
