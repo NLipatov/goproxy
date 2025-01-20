@@ -28,3 +28,4 @@ go.work.sum
 /.idea/goproxy.iml
 /.idea/dataSources.xml
 /.idea/sqldialects.xml
+/.idea/forwardedPorts.xml
