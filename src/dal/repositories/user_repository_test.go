@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
-	"goproxy/dal/repositories/mocks"
 	"goproxy/domain/aggregates"
 	"os"
 	"testing"
@@ -30,7 +29,7 @@ func TestUserRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	repo := NewUserRepository(db, cache, mocks.NewMockMessageBusService())
+	repo := NewUserRepository(db, cache)
 
 	t.Run("GetByUsername", func(t *testing.T) {
 		userId := insertTestUser(repo, t)
@@ -82,9 +81,9 @@ func TestUserRepository(t *testing.T) {
 		}
 		assertNoError(t, repo.Update(updatedUser), "Failed to update user")
 
-		loadedUser, loadedUserErr := repo.GetById(user.Id())
-		assertNoError(t, loadedUserErr, "Failed to load updated user")
-		assertUsersNotEqual(t, user, loadedUser)
+		loadedUpdatedUser, loadedUpdatedUserErr := repo.GetById(user.Id())
+		assertNoError(t, loadedUpdatedUserErr, "Failed to load updated user")
+		assertUsersNotEqual(t, user, loadedUpdatedUser)
 	})
 }
 

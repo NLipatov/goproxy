@@ -9,6 +9,7 @@ import (
 )
 
 type UserUseCasesContract interface {
+	GetByEmail(email string) (aggregates.User, error)
 	GetById(id int) (aggregates.User, error)
 	Create(command commands.PostUser) (int, error)
 	Update(entity aggregates.User) error

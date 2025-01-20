@@ -1,19 +1,25 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"goproxy/application"
 	"goproxy/dal"
 	"goproxy/dal/repositories"
 	"goproxy/domain"
+	"goproxy/domain/aggregates"
+	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure"
+	"goproxy/infrastructure/api/api-http/google_auth"
+	"goproxy/infrastructure/api/api-http/users"
+	"goproxy/infrastructure/api/api-ws"
 	"goproxy/infrastructure/config"
-	"goproxy/infrastructure/dto"
-	"goproxy/infrastructure/restapi"
-	"goproxy/infrastructure/restapi/google_auth"
+	"goproxy/infrastructure/eventhandlers/UserConsumedTrafficEvent"
+	"goproxy/infrastructure/eventhandlers/UserPasswordChangedEvent"
 	"goproxy/infrastructure/services"
 	"log"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -63,28 +69,26 @@ func startGoogleAuthController() {
 		log.Fatal(err)
 	}
 
-	userRepoKafkaConf := config.KafkaConfig{
-		BootstrapServers: kafkaConf.BootstrapServers,
-		GroupID:          "user-repository",
-		AutoOffsetReset:  kafkaConf.AutoOffsetReset,
-		Topic:            kafkaConf.Topic,
+	eventHandleErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
+		ProcessEvents()
+	if eventHandleErr != nil {
+		log.Fatal(eventHandleErr)
 	}
 
-	userRepoKafka, userRepoKafkaErr := services.NewKafkaService(userRepoKafkaConf)
-	if userRepoKafkaErr != nil {
-		log.Fatal(userRepoKafkaErr)
-	}
-
-	userRepository := repositories.NewUserRepository(db, cache, userRepoKafka)
+	userRepo := repositories.NewUserRepository(db, cache)
 	cryptoService := services.GetCryptoService()
-	userUseCases := application.NewUserUseCases(userRepository, cryptoService)
+	userUseCases := application.NewUserUseCases(userRepo, cryptoService)
 	authService := google_auth.NewGoogleAuthService(userUseCases, cryptoService, messageBusService)
 	controller := google_auth.NewGoogleAuthController(authService)
-
 	controller.Listen(oauthConfig.Port)
 }
 
 func startPlanController() {
+	usersRestApiHost := os.Getenv("USERS_API_HOST")
+	if usersRestApiHost == "" {
+		log.Fatalf("USERS_API_HOST environment variable not set")
+	}
+
 	db, err := dal.ConnectDB()
 	if err != nil {
 		log.Fatal(err)
@@ -93,36 +97,43 @@ func startPlanController() {
 		_ = db.Close()
 	}(db)
 
-	kafkaConf, kafkaConfErr := config.NewKafkaConfig(domain.PLAN)
-	if kafkaConfErr != nil {
-		log.Fatal(kafkaConfErr)
-	}
-
-	messageBusService, err := services.NewKafkaService(kafkaConf)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	redisCache, newRedisClientErr := services.NewRedisCache[dto.UserTraffic]()
-	if newRedisClientErr != nil {
-		log.Fatalf("failed to instantiate redis cache service: %s", newRedisClientErr)
+	trafficCache, trafficCacheErr := services.NewRedisCache[dataobjects.UserTraffic]()
+	if trafficCacheErr != nil {
+		log.Fatalf("failed to instantiate cache service: %s", trafficCacheErr)
 	}
 
 	planRepo := repositories.NewPlansRepository(db)
 	userPlanRepo := repositories.NewUserPlanRepository(db)
 
-	controller, err := infrastructure.NewTrafficCollector().
-		UsePlanRepository(planRepo).
-		UseUserPlanRepository(userPlanRepo).
-		UseMessageBus(messageBusService).
-		UseCache(redisCache).
-		Build()
+	userConsumedTrafficEventProcessorErr := UserConsumedTrafficEvent.NewUserConsumedTrafficEventProcessor(trafficCache, userPlanRepo, planRepo, domain.PLAN).
+		ProcessEvents()
 
-	if err != nil {
-		log.Fatalf("failed to instantiate plan controller: %s", err)
+	if userConsumedTrafficEventProcessorErr != nil {
+		log.Fatal(userConsumedTrafficEventProcessorErr)
 	}
 
-	controller.ProcessEvents()
+	bigCache, err := repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	planCache, planCacheErr := services.NewRedisCache[dataobjects.UserPlan]()
+	if planCacheErr != nil {
+		log.Fatalf("failed to instantiate cache service: %s", planCacheErr)
+	}
+
+	userRepo := repositories.NewUserRepository(db, bigCache)
+	userPlanInfoUseCases := application.NewUserPlanInfoUseCases(planRepo, userPlanRepo, userRepo, planCache, trafficCache)
+	planController := api_ws.NewPlanController(userPlanInfoUseCases, usersRestApiHost)
+	planController.Listen(3031)
+
+	for {
+		select {
+		case <-context.Background().Done():
+			return
+		default:
+		}
+	}
 }
 
 func startKafkaRelay() {
@@ -143,9 +154,14 @@ func applyMigrations() {
 }
 
 func startHttpProxy() {
-	port := os.Getenv("HTTP_LISTENER_PORT")
-	if port == "" {
+	strPort := os.Getenv("HTTP_LISTENER_PORT")
+	if strPort == "" {
 		log.Fatalf("'HTTP_LISTENER_PORT' env var must be set")
+	}
+
+	port, err := strconv.Atoi(strPort)
+	if err != nil {
+		log.Fatalf("failed to parse HTTP_LISTENER_PORT: %s", err)
 	}
 
 	db, err := dal.ConnectDB()
@@ -167,42 +183,45 @@ func startHttpProxy() {
 	}
 	kafkaConfig.GroupID = "proxy"
 
-	kafkaService, kafkaServiceErr := services.NewKafkaService(kafkaConfig)
-	if kafkaServiceErr != nil {
-		log.Fatal(kafkaServiceErr)
+	eventHandleErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
+		ProcessEvents()
+	if eventHandleErr != nil {
+		log.Fatal(eventHandleErr)
 	}
 
-	userRepoKafkaConf := config.KafkaConfig{
-		BootstrapServers: kafkaConfig.BootstrapServers,
-		GroupID:          "user-repository",
-		AutoOffsetReset:  kafkaConfig.AutoOffsetReset,
-		Topic:            kafkaConfig.Topic,
-	}
-
-	userRepoKafka, userRepoKafkaErr := services.NewKafkaService(userRepoKafkaConf)
-	if userRepoKafkaErr != nil {
-		log.Fatal(userRepoKafkaErr)
-	}
+	userRepo := repositories.NewUserRepository(db, cache)
 
 	userRestrictionService := services.NewUserRestrictionService()
-	userRepository := repositories.NewUserRepository(db, cache, userRepoKafka)
 	cryptoService := services.GetCryptoService()
-	authService := services.NewAuthService(cryptoService, kafkaService)
-	authUseCases := application.NewAuthUseCases(authService, userRepository, userRestrictionService)
+	authCache := services.NewMapCacheWithTTL[services.ValidateResult]()
+
+	authCacheEventHandlerErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[services.ValidateResult](domain.PROXY, authCache).
+		ProcessEvents()
+	if authCacheEventHandlerErr != nil {
+		log.Fatal(eventHandleErr)
+	}
+
+	authService := services.NewAuthService(cryptoService, authCache)
+	authUseCases := application.NewAuthUseCases(authService, userRepo, userRestrictionService)
 
 	go userRestrictionService.ProcessEvents()
 
-	listener := infrastructure.NewHttpListener(authUseCases)
-	err = listener.ServePort(port)
-	if err != nil {
-		log.Printf("Failed serving port: %v", err)
-	}
+	dialerPool := services.NewDialerPool(services.NewIPResolver())
+	dialerPool.StartExploringNewPublicIps(context.Background(), time.Hour*8)
+	proxy := services.NewProxy(dialerPool)
+	listener := infrastructure.NewHttpListener(proxy)
+	proxyUseCases := application.NewProxyUseCases(proxy, listener, authUseCases)
+	proxyUseCases.ServeOnPort(port)
 }
 
 func startHttpRestApi() {
-	port := os.Getenv("HTTP_REST_API_PORT")
-	if port == "" {
+	strPort := os.Getenv("HTTP_REST_API_PORT")
+	if strPort == "" {
 		log.Fatalf("'HTTP_REST_API_PORT' env var must be set")
+	}
+	port, portErr := strconv.Atoi(strPort)
+	if portErr != nil {
+		log.Fatal(portErr)
 	}
 
 	db, err := dal.ConnectDB()
@@ -218,31 +237,19 @@ func startHttpRestApi() {
 		log.Fatal(err)
 	}
 
-	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(domain.PROXY)
-	if kafkaConfigErr != nil {
-		log.Fatal(kafkaConfigErr)
+	eventHandleErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
+		ProcessEvents()
+	if eventHandleErr != nil {
+		log.Fatal(eventHandleErr)
 	}
 
-	userRepoKafkaConf := config.KafkaConfig{
-		BootstrapServers: kafkaConfig.BootstrapServers,
-		GroupID:          "user-repository",
-		AutoOffsetReset:  kafkaConfig.AutoOffsetReset,
-		Topic:            kafkaConfig.Topic,
-	}
+	userRepo := repositories.NewUserRepository(db, cache)
 
-	userRepoKafka, userRepoKafkaErr := services.NewKafkaService(userRepoKafkaConf)
-	if userRepoKafkaErr != nil {
-		log.Fatal(userRepoKafkaErr)
-	}
-	userRepository := repositories.NewUserRepository(db, cache, userRepoKafka)
 	cryptoService := services.GetCryptoService()
-	useCases := application.NewUserUseCases(userRepository, cryptoService)
+	useCases := application.NewUserUseCases(userRepo, cryptoService)
 
-	usersController := restapi.NewUsersController(useCases)
-	err = usersController.ServePort(port)
-	if err != nil {
-		log.Printf("Failed serving port: %v", err)
-	}
+	usersController := users.NewUsersController(useCases)
+	usersController.Listen(port)
 }
 
 func createBigcacheInstance() (repositories.BigCacheUserRepositoryCache, error) {

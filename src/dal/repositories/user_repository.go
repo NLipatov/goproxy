@@ -2,84 +2,20 @@ package repositories
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"goproxy/application"
-	"goproxy/domain"
 	"goproxy/domain/aggregates"
-	"goproxy/domain/events"
-	"goproxy/infrastructure/config"
-	"log"
-	"strings"
-	"sync"
 )
 
 type UserRepository struct {
-	db          *sql.DB
-	cache       BigCacheUserRepositoryCache
-	kafkaConfig config.KafkaConfig
-	messageBus  application.MessageBusService
-	once        sync.Once
+	db    *sql.DB
+	cache BigCacheUserRepositoryCache
 }
 
-func NewUserRepository(db *sql.DB, cache BigCacheUserRepositoryCache, messageBusService application.MessageBusService) *UserRepository {
-	service := &UserRepository{
-		db:         db,
-		cache:      cache,
-		messageBus: messageBusService,
-	}
-
-	service.startProcessingEvents()
-
-	return service
-}
-
-func (u *UserRepository) startProcessingEvents() {
-	u.once.Do(func() {
-
-		go u.processEvents()
-	})
-}
-
-func (u *UserRepository) processEvents() {
-	defer func(messageBus application.MessageBusService) {
-		_ = messageBus.Close()
-	}(u.messageBus)
-
-	topics := []string{fmt.Sprintf("%s", domain.PROXY)}
-	err := u.messageBus.Subscribe(topics)
-	if err != nil {
-		log.Fatalf("Failed to subscribe to topics: %s", err)
-	}
-
-	log.Printf("Subscribed to topics: %s", strings.Join(topics, ", "))
-
-	for {
-		event, consumeErr := u.messageBus.Consume()
-		if consumeErr != nil {
-			log.Printf("failed to consume from message bus: %s", consumeErr)
-		}
-
-		if event == nil {
-			log.Printf("received nil event from message bus")
-			continue
-		}
-
-		if event.EventType.Value() == "UserPasswordChangedEvent" {
-			var userPasswordChangedEvent events.UserPasswordChangedEvent
-			deserializationErr := json.Unmarshal([]byte(event.Payload), &userPasswordChangedEvent)
-			if deserializationErr != nil {
-				log.Printf("failed to deserialize user password changed event: %s", deserializationErr)
-			}
-
-			err = u.cache.Delete(userPasswordChangedEvent.Username)
-			if err == nil {
-				log.Printf("user %s removed from user repository cache", userPasswordChangedEvent.Username)
-			} else {
-				log.Printf("user %s was not removed from user repository cache: %s", userPasswordChangedEvent.Username, err)
-			}
-		}
+func NewUserRepository(db *sql.DB, cache BigCacheUserRepositoryCache) *UserRepository {
+	return &UserRepository{
+		db:    db,
+		cache: cache,
 	}
 }
 
@@ -116,6 +52,11 @@ func (u *UserRepository) GetByUsername(username string) (aggregates.User, error)
 }
 
 func (u *UserRepository) GetById(id int) (aggregates.User, error) {
+	cachedUser, cachedUserErr := u.cache.Get(fmt.Sprintf("%v", id))
+	if cachedUserErr == nil {
+		return cachedUser, nil
+	}
+
 	var username string
 	var email string
 	var passwordHash string
@@ -136,10 +77,17 @@ func (u *UserRepository) GetById(id int) (aggregates.User, error) {
 		return aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
 	}
 
+	_ = u.cache.Set(fmt.Sprintf("%v", id), user)
+
 	return user, nil
 }
 
 func (u *UserRepository) GetByEmail(email string) (aggregates.User, error) {
+	cachedUser, cachedUserErr := u.cache.Get(email)
+	if cachedUserErr == nil {
+		return cachedUser, nil
+	}
+
 	var id int
 	var usernameResult string
 	var emailResult string
@@ -160,6 +108,8 @@ func (u *UserRepository) GetByEmail(email string) (aggregates.User, error) {
 	if userErr != nil {
 		return aggregates.User{}, fmt.Errorf("invalid user data: %v", userErr)
 	}
+
+	_ = u.cache.Set(email, user)
 
 	return user, nil
 }
@@ -185,6 +135,7 @@ func (u *UserRepository) Update(user aggregates.User) error {
 		return fmt.Errorf("no rows updated for user plan id: %d", user.Id())
 	}
 
+	_ = u.cache.Delete(fmt.Sprintf("%v", user.Id()))
 	return nil
 }
 

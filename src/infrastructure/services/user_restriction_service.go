@@ -22,7 +22,7 @@ type UserRestrictionService struct {
 
 var remoteCacheLocks sync.Map
 
-const userRestrictionServiceTTL = time.Minute * 1
+const userRestrictionServiceTTL = time.Second * 15
 
 func NewUserRestrictionService() *UserRestrictionService {
 	remoteCache, redisCacheErr := NewRedisCache[bool]()
