@@ -10,10 +10,11 @@ type Plan struct {
 	name       valueobjects.PlanName
 	limitBytes valueobjects.PlanBytesLimit
 	duration   valueobjects.PlanDuration
+	features   []valueobjects.PlanFeature
 	createdAt  time.Time
 }
 
-func NewPlan(id int, name string, limitBytes int64, durationDays int) (Plan, error) {
+func NewPlan(id int, name string, limitBytes int64, durationDays int, features []valueobjects.PlanFeature) (Plan, error) {
 	limit, limitErr := valueobjects.PlanBytesLimitFromInt64(limitBytes)
 	if limitErr != nil {
 		return Plan{}, limitErr
@@ -34,6 +35,7 @@ func NewPlan(id int, name string, limitBytes int64, durationDays int) (Plan, err
 		name:       planName,
 		limitBytes: limit,
 		duration:   planDuration,
+		features:   features,
 		createdAt:  time.Now().UTC(),
 	}, nil
 }
@@ -52,6 +54,10 @@ func (p *Plan) LimitBytes() int64 {
 
 func (p *Plan) DurationDays() int {
 	return p.duration.DurationDays()
+}
+
+func (p *Plan) Features() []valueobjects.PlanFeature {
+	return p.features
 }
 
 func (p *Plan) CreatedAt() time.Time {
