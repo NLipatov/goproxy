@@ -19,7 +19,7 @@ func NewAuthUseCases(authService AuthService, userRepository UserRepository, use
 	}
 }
 
-func (a *AuthUseCases) Authorize(credentials valueobjects.Credentials) (bool, int, error) {
+func (a *AuthUseCases) AuthorizeBasic(credentials valueobjects.Credentials) (bool, int, error) {
 	bCredentials, ok := credentials.(*valueobjects.BasicCredentials)
 	if ok {
 		user, err := a.userRepository.GetByUsername(bCredentials.Username)
