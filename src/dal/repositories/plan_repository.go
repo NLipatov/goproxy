@@ -5,14 +5,63 @@ import (
 	"errors"
 	"fmt"
 	"goproxy/domain/aggregates"
+	"goproxy/domain/valueobjects"
 	"time"
 )
 
-const selectPlanByNameQuery = "SELECT id, name, limit_bytes, duration_days, created_at FROM plans.public.plans WHERE name = $1"
-const selectPlanByIdQuery = "SELECT id, name, limit_bytes, duration_days, created_at FROM plans.public.plans WHERE id = $1"
-const insertPlanQuery = "INSERT INTO plans.public.plans (name, limit_bytes, duration_days) VALUES ($1, $2, $3) RETURNING id"
-const updatePlanQuery = "UPDATE plans.public.plans SET name=$1, limit_bytes=$2, duration_days=$3 WHERE id = $4 RETURNING id"
-const deletePlanQuery = "DELETE FROM plans.public.plans WHERE id = $1"
+const selectPlanByNameQuery = `
+SELECT id, name, limit_bytes, duration_days, created_at 
+FROM plans.public.plans 
+WHERE name = $1`
+
+const selectPlanByIdQuery = `
+SELECT id, name, limit_bytes, duration_days, created_at 
+FROM plans.public.plans 
+WHERE id = $1`
+
+const insertPlanQuery = `
+INSERT INTO plans.public.plans (name, limit_bytes, duration_days) 
+VALUES ($1, $2, $3) 
+RETURNING id`
+
+const updatePlanQuery = `
+UPDATE plans.public.plans 
+SET name=$1, limit_bytes=$2, duration_days=$3 
+WHERE id = $4 
+RETURNING id`
+
+const deletePlanQuery = `
+DELETE FROM plans.public.plans WHERE id = $1`
+
+const GetPlanByIdWithFeaturesQuery = `
+SELECT
+    plans.id AS plan_id,
+    plans.name,
+    plans.limit_bytes,
+    plans.duration_days,
+    features.id AS feature_id,
+    features.description AS feature_description,
+    plans.created_at
+FROM plans
+         LEFT JOIN plan_features ON plans.id = plan_features.plan_id
+         LEFT JOIN features ON plan_features.feature_id = features.id
+WHERE plans.id = $1;
+`
+
+const GetPlanByNameWithFeaturesQuery = `
+SELECT
+    plans.id AS plan_id,
+    plans.name,
+    plans.limit_bytes,
+    plans.duration_days,
+    features.id AS feature_id,
+    features.description AS feature_description,
+    plans.created_at
+FROM plans
+         LEFT JOIN plan_features ON plans.id = plan_features.plan_id
+         LEFT JOIN features ON plan_features.feature_id = features.id
+WHERE plans.name = $1;
+`
 
 type PlanRepository struct {
 	db *sql.DB
@@ -47,7 +96,7 @@ func (p *PlanRepository) getPlan(query string, args ...interface{}) (aggregates.
 		return aggregates.Plan{}, err
 	}
 
-	plan, err := aggregates.NewPlan(Id, Name, LimitBytes, DurationDays)
+	plan, err := aggregates.NewPlan(Id, Name, LimitBytes, DurationDays, make([]valueobjects.PlanFeature, 0))
 	if err != nil {
 		fmt.Printf("plan validation err (invalid plan stored in db?): %s, plan id: %d", err, Id)
 	}
@@ -84,4 +133,50 @@ func (p *PlanRepository) Delete(plan aggregates.Plan) error {
 		return fmt.Errorf("no rows affected")
 	}
 	return nil
+}
+
+func (p *PlanRepository) GetByIdWithFeatures(id int) (aggregates.Plan, error) {
+	return p.getPlanWithFeatures(GetPlanByIdWithFeaturesQuery, id)
+}
+
+func (p *PlanRepository) GetByNameWithFeatures(name string) (aggregates.Plan, error) {
+	return p.getPlanWithFeatures(GetPlanByNameWithFeaturesQuery, name)
+}
+
+func (p *PlanRepository) getPlanWithFeatures(query string, arg interface{}) (aggregates.Plan, error) {
+	var planId int
+	var name string
+	var limitBytes int64
+	var durationDays int
+	var createdAt time.Time
+
+	var features []valueobjects.PlanFeature
+
+	rows, err := p.db.Query(query, arg)
+	if err != nil {
+		return aggregates.Plan{}, fmt.Errorf("failed to query plan with features: %v", err)
+	}
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
+
+	for rows.Next() {
+		var featureId int
+		var featureDescription sql.NullString
+
+		err = rows.Scan(&planId, &name, &limitBytes, &durationDays, &featureId, &featureDescription, &createdAt)
+		if err != nil {
+			return aggregates.Plan{}, fmt.Errorf("failed to scan row (query: %s, arg: %v): %w", query, arg, err)
+		}
+
+		if featureDescription.Valid {
+			features = append(features, valueobjects.NewPlanFeature(featureId, featureDescription.String))
+		}
+	}
+
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return aggregates.Plan{}, fmt.Errorf("rows iteration error: %v", rowsErr)
+	}
+
+	return aggregates.NewPlan(planId, name, limitBytes, durationDays, features)
 }
