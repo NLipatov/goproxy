@@ -79,7 +79,7 @@ func insertTestEvent(repo *DomainEventRepository, t *testing.T) int {
 
 func assertEventExists(t *testing.T, event events.OutboxEvent, expectedId int) {
 	if event.Id != expectedId {
-		t.Errorf("Expected event ID %d, got %d", expectedId, event.Id)
+		t.Errorf("Expected event Id %d, got %d", expectedId, event.Id)
 	}
 	if event.Payload == "" {
 		t.Errorf("Expected non-empty payload, but got empty")

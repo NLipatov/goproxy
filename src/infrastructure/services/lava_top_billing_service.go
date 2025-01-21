@@ -20,7 +20,7 @@ type LavaTopBillingService struct {
 	apiKey         string
 }
 
-func NewLavaTopBillingService() LavaTopBillingService {
+func NewLavaTopBillingService() *LavaTopBillingService {
 	getInvoiceUrl := os.Getenv("GET_INVOICE_API_URL")
 	if getInvoiceUrl == "" {
 		log.Fatalf("GET_INVOICE_API_URL environment variable not set")
@@ -41,7 +41,7 @@ func NewLavaTopBillingService() LavaTopBillingService {
 		log.Fatalf("LAVATOP_API_KEY environment variable not set")
 	}
 
-	return LavaTopBillingService{
+	return &LavaTopBillingService{
 		getOffersUrl:   getOffersUrl,
 		getInvoiceUrl:  getInvoiceUrl,
 		postInvoiceUrl: postInvoiceUrl,
@@ -75,7 +75,7 @@ func (l *LavaTopBillingService) GetOffers() ([]lavatopvalueobjects.Offer, error)
 
 				prices[i] = lavatopvalueobjects.NewPrice(int64(price.Amount*100), currency, periodicity)
 			}
-			object := lavatopvalueobjects.NewOffer(offer.ID, offer.Name, prices)
+			object := lavatopvalueobjects.NewOffer(offer.Id, offer.Name, prices)
 			offers = append(offers, object)
 		}
 	}
@@ -120,7 +120,7 @@ func (l *LavaTopBillingService) PublishInvoice(invoice lavatopaggregates.Invoice
 	updatedInvoice, err := lavatopaggregates.NewInvoice(
 		invoice.Id(),
 		2,
-		successResponse.ID,
+		successResponse.Id,
 		updatedStatus,
 		invoice.Email(),
 		invoice.Offer(),

@@ -104,7 +104,7 @@ func (p *ProxyUseCases) HandleAuthorization(clientConn net.Conn, request *http.R
 		return UnauthorizedError{}
 	}
 
-	authorized, userId, authorizationErr := p.authUseCases.Authorize(credentials)
+	authorized, userId, authorizationErr := p.authUseCases.AuthorizeBasic(credentials)
 	if authorizationErr != nil {
 		log.Printf("Could not authorize: %v", authorizationErr)
 		return UnauthorizedError{}

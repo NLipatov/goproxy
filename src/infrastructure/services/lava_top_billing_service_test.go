@@ -14,7 +14,7 @@ import (
 
 func TestPublishInvoice(t *testing.T) {
 	mockResponse := dto.InvoicePaymentParamsResponse{
-		ID:     "e624e74b-a109-4775-b8e2-be27ce89a0b8",
+		Id:     "e624e74b-a109-4775-b8e2-be27ce89a0b8",
 		Status: "in-progress",
 		AmountTotal: dto.AmountTotalDto{
 			Currency: "RUB",
@@ -69,7 +69,7 @@ func TestPublishInvoice(t *testing.T) {
 	}
 
 	if updatedInvoice.Id() != invoice.Id() {
-		t.Errorf("Expected ID %d, got %d", invoice.Id(), updatedInvoice.Id())
+		t.Errorf("Expected Id %d, got %d", invoice.Id(), updatedInvoice.Id())
 	}
 
 	if updatedInvoice.Offer().ExtId() != invoice.Offer().ExtId() {
@@ -148,7 +148,7 @@ func TestPublishInvoice_404Response(t *testing.T) {
 
 func TestGetInvoiceStatus(t *testing.T) {
 	mockResponse := dto.InvoicePaymentParamsResponse{
-		ID:     "f1f47a26-4795-420e-8dc1-2260dd065fbb",
+		Id:     "f1f47a26-4795-420e-8dc1-2260dd065fbb",
 		Status: "in-progress",
 		AmountTotal: dto.AmountTotalDto{
 			Currency: "RUB",
@@ -166,8 +166,8 @@ func TestGetInvoiceStatus(t *testing.T) {
 		}
 
 		query := r.URL.Query()
-		if query.Get("id") != mockResponse.ID {
-			t.Fatalf("Expected ID %s, got %s", mockResponse.ID, query.Get("id"))
+		if query.Get("id") != mockResponse.Id {
+			t.Fatalf("Expected Id %s, got %s", mockResponse.Id, query.Get("id"))
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -241,7 +241,7 @@ func TestGetOffers(t *testing.T) {
 				Title: "1 Month Plan",
 				Offers: []dto.OfferResponse{
 					{
-						ID:   "6c0cf730-3432-4755-941b-ca23b419d6df",
+						Id:   "6c0cf730-3432-4755-941b-ca23b419d6df",
 						Name: "1 Month Plan",
 						Prices: []dto.PriceDto{
 							{
@@ -309,7 +309,7 @@ func TestGetOffers(t *testing.T) {
 	actualOffer := offers[0]
 
 	if actualOffer.ExtId() != expectedOffer.ExtId() {
-		t.Errorf("Expected offer ID %s, got %s", expectedOffer.ExtId(), actualOffer.ExtId())
+		t.Errorf("Expected offer Id %s, got %s", expectedOffer.ExtId(), actualOffer.ExtId())
 	}
 
 	if actualOffer.Name() != expectedOffer.Name() {
