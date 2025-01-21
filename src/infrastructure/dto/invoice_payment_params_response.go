@@ -1,7 +1,7 @@
 package dto
 
 type InvoicePaymentParamsResponse struct {
-	ID          string         `json:"id"`
+	Id          string         `json:"id"`
 	Status      string         `json:"status"`
 	AmountTotal AmountTotalDto `json:"amountTotal"`
 	PaymentURL  string         `json:"paymentUrl,omitempty"`

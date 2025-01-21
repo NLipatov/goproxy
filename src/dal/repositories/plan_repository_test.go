@@ -38,7 +38,7 @@ func TestPlansRepository(t *testing.T) {
 		plan, err := repo.GetById(planId)
 		assertNoError(t, err, "Failed to load plan by Id")
 		loadedPlan, err := repo.GetById(plan.Id())
-		assertNoError(t, err, "Failed to load plan by ID")
+		assertNoError(t, err, "Failed to load plan by Id")
 		assertPlansEqual(t, plan, loadedPlan)
 	})
 

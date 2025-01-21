@@ -75,7 +75,7 @@ func (l *LavaTopBillingService) GetOffers() ([]lavatopvalueobjects.Offer, error)
 
 				prices[i] = lavatopvalueobjects.NewPrice(int64(price.Amount*100), currency, periodicity)
 			}
-			object := lavatopvalueobjects.NewOffer(offer.ID, offer.Name, prices)
+			object := lavatopvalueobjects.NewOffer(offer.Id, offer.Name, prices)
 			offers = append(offers, object)
 		}
 	}
@@ -120,7 +120,7 @@ func (l *LavaTopBillingService) PublishInvoice(invoice lavatopaggregates.Invoice
 	updatedInvoice, err := lavatopaggregates.NewInvoice(
 		invoice.Id(),
 		2,
-		successResponse.ID,
+		successResponse.Id,
 		updatedStatus,
 		invoice.Email(),
 		invoice.Offer(),
