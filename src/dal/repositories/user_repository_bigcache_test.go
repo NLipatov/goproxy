@@ -32,9 +32,10 @@ func TestSetAndGet(t *testing.T) {
 }
 
 func TestTTLExpiration(t *testing.T) {
-	ttl := 100 * time.Millisecond
-	cleanInterval := 100 * time.Millisecond
-	shards := 1024
+	//big cache min ttl is 1 second
+	ttl := time.Second
+	cleanInterval := time.Second
+	shards := 2
 	maxEntrySize := 500
 
 	cache, err := NewBigCacheUserRepositoryCache(ttl, cleanInterval, shards, maxEntrySize)
@@ -56,7 +57,7 @@ func TestTTLExpiration(t *testing.T) {
 	assert.NoError(t, err, "failed to fetch user before TTL expiration")
 	assert.Equal(t, user, fetchedUser, "fetched user does not match the original before TTL expiration")
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(ttl + cleanInterval*2)
 
 	_, err = cache.Get(key)
 	assert.Error(t, err, "expected error due to TTL expiration")

@@ -4,36 +4,43 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"goproxy/application"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/valueobjects"
 	"time"
 )
 
-const selectPlanByNameQuery = `
+const (
+	selectPlans = `
+SELECT id, name, limit_bytes, duration_days, created_at
+FROM plans
+`
+
+	selectPlanByNameQuery = `
 SELECT id, name, limit_bytes, duration_days, created_at 
 FROM plans.public.plans 
 WHERE name = $1`
 
-const selectPlanByIdQuery = `
+	selectPlanByIdQuery = `
 SELECT id, name, limit_bytes, duration_days, created_at 
 FROM plans.public.plans 
 WHERE id = $1`
 
-const insertPlanQuery = `
+	insertPlanQuery = `
 INSERT INTO plans.public.plans (name, limit_bytes, duration_days) 
 VALUES ($1, $2, $3) 
 RETURNING id`
 
-const updatePlanQuery = `
+	updatePlanQuery = `
 UPDATE plans.public.plans 
 SET name=$1, limit_bytes=$2, duration_days=$3 
 WHERE id = $4 
 RETURNING id`
 
-const deletePlanQuery = `
+	deletePlanQuery = `
 DELETE FROM plans.public.plans WHERE id = $1`
 
-const GetPlanByIdWithFeaturesQuery = `
+	GetPlanByIdWithFeaturesQuery = `
 SELECT
     plans.id AS plan_id,
     plans.name,
@@ -48,7 +55,7 @@ FROM plans
 WHERE plans.id = $1;
 `
 
-const GetPlanByNameWithFeaturesQuery = `
+	GetPlanByNameWithFeaturesQuery = `
 SELECT
     plans.id AS plan_id,
     plans.name,
@@ -62,15 +69,20 @@ FROM plans
          LEFT JOIN features ON plan_features.feature_id = features.id
 WHERE plans.name = $1;
 `
+)
 
 type PlanRepository struct {
 	db *sql.DB
 }
 
-func NewPlansRepository(db *sql.DB) *PlanRepository {
+func NewPlansRepository(db *sql.DB) application.PlanRepository {
 	return &PlanRepository{
 		db: db,
 	}
+}
+
+func (p *PlanRepository) GetAll() (aggregates.Plan, error) {
+	return p.getPlan(selectPlans)
 }
 
 func (p *PlanRepository) GetByName(name string) (aggregates.Plan, error) {
@@ -161,7 +173,7 @@ func (p *PlanRepository) getPlanWithFeatures(query string, arg interface{}) (agg
 	}(rows)
 
 	for rows.Next() {
-		var featureId int
+		var featureId sql.NullInt64
 		var featureDescription sql.NullString
 
 		err = rows.Scan(&planId, &name, &limitBytes, &durationDays, &featureId, &featureDescription, &createdAt)
@@ -170,7 +182,10 @@ func (p *PlanRepository) getPlanWithFeatures(query string, arg interface{}) (agg
 		}
 
 		if featureDescription.Valid {
-			features = append(features, valueobjects.NewPlanFeature(featureId, featureDescription.String))
+			if featureId.Valid {
+				pId := int(featureId.Int64)
+				features = append(features, valueobjects.NewPlanFeature(pId, featureDescription.String))
+			}
 		}
 	}
 

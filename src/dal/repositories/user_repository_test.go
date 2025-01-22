@@ -18,6 +18,10 @@ func TestUserRepository(t *testing.T) {
 		t.Fatal(setEnvErr)
 	}
 
+	defer func() {
+		_ = os.Unsetenv("DB_DATABASE")
+	}()
+
 	db, cleanup := prepareDb(t)
 	defer cleanup()
 	defer func(db *sql.DB) {
