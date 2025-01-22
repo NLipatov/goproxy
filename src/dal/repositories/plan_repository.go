@@ -161,7 +161,7 @@ func (p *PlanRepository) getPlanWithFeatures(query string, arg interface{}) (agg
 	}(rows)
 
 	for rows.Next() {
-		var featureId int
+		var featureId sql.NullInt64
 		var featureDescription sql.NullString
 
 		err = rows.Scan(&planId, &name, &limitBytes, &durationDays, &featureId, &featureDescription, &createdAt)
@@ -170,7 +170,10 @@ func (p *PlanRepository) getPlanWithFeatures(query string, arg interface{}) (agg
 		}
 
 		if featureDescription.Valid {
-			features = append(features, valueobjects.NewPlanFeature(featureId, featureDescription.String))
+			if featureId.Valid {
+				pId := int(featureId.Int64)
+				features = append(features, valueobjects.NewPlanFeature(pId, featureDescription.String))
+			}
 		}
 	}
 
