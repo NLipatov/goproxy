@@ -2,11 +2,15 @@ package repositories
 
 import (
 	"database/sql"
+	"fmt"
+	"github.com/google/uuid"
+	"goproxy/application"
 	"goproxy/dal/repositories/mocks"
+	"goproxy/domain/dataobjects"
 	"os"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPlanLavatopOfferRepository(t *testing.T) {
@@ -15,85 +19,106 @@ func TestPlanLavatopOfferRepository(t *testing.T) {
 		t.Fatal(setEnvErr)
 	}
 
+	defer func() {
+		_ = os.Unsetenv("DB_DATABASE")
+	}()
+
 	db, cleanup := prepareDb(t)
 	defer cleanup()
 	defer func(db *sql.DB) {
 		_ = db.Close()
 	}(db)
 
-	cache := mocks.NewMockCacheWithTTL[[]string]()
-	repo := NewPlanLavatopOfferRepository(db, cache)
-	plansRepo := NewPlansRepository(db)
+	cache := mocks.NewMockCacheWithTTL[[]dataobjects.PlanLavatopOffer]()
+	planOfferRepo := NewPlanLavatopOfferRepository(db, cache)
+	planRepo := NewPlansRepository(db)
 
-	t.Run("GetOfferIds", func(t *testing.T) {
-		planId := insertTestPlan(plansRepo, t)
-		offerIds := generateUUIDs(3)
-		for _, offerId := range offerIds {
-			rowsAffected, err := repo.AddOffer(planId, offerId)
-			if err != nil {
-				t.Fatal(err)
+	t.Run("GetOffers", func(t *testing.T) {
+		ploCount := 5
+		planId := insertTestPlan(planRepo, t)
+
+		expected := insertTestPlanOffers(planOfferRepo, planId, ploCount, t)
+
+		actual, err := planOfferRepo.GetOffers(planId)
+
+		var matched int
+		for _, e := range expected {
+			for _, a := range actual {
+				if e.Id() == a.Id() &&
+					e.OfferId() == a.OfferId() &&
+					e.PlanId() == a.PlanId() {
+					matched++
+				}
 			}
-			if rowsAffected == 0 {
-				t.Fatal("expected to get a row affected, but got none")
-			}
 		}
 
-		offers, err := repo.GetOfferIds(planId)
-		assertNoError(t, err, "Failed to get offer IDs")
-		if len(offers) != 3 {
-			t.Errorf("Expected 3 offers, got %d", len(offers))
-		}
-
-		if !equalSlices(offerIds, offers) {
-			t.Errorf("Expected offers %v, got %v", offerIds, offers)
-		}
-
+		assert.Nil(t, err)
+		assert.Equal(t, matched, ploCount)
+		assert.Equal(t, ploCount, len(actual))
 	})
 
-	t.Run("AddOffer", func(t *testing.T) {
-		planId := insertTestPlan(plansRepo, t)
-		newOffer := uuid.New().String()
-		rowsAffected, err := repo.AddOffer(planId, newOffer)
-		assertNoError(t, err, "Failed to add offer")
-		if rowsAffected != 1 {
-			t.Errorf("Expected 1 row affected, got %d", rowsAffected)
-		}
+	t.Run("Create", func(t *testing.T) {
+		planId := insertTestPlan(planRepo, t)
+		offerId := fmt.Sprintf("%s", uuid.New())
 
-		offers, err := repo.GetOfferIds(planId)
-		assertNoError(t, err, "Failed to get offer IDs after adding offer")
-		if len(offers) != 1 || offers[0] != newOffer {
-			t.Errorf("Expected %s in offers, got %v", newOffer, offers)
-		}
+		ploId, createErr := planOfferRepo.Create(dataobjects.NewPlanLavatopOffer(-1, planId, offerId))
+		offers, err := planOfferRepo.GetOffers(planId)
+
+		assert.Nil(t, err)
+		assert.Nil(t, createErr)
+		assert.Equal(t, offerId, offers[0].OfferId())
+		assert.Equal(t, planId, offers[0].PlanId())
+		assert.Equal(t, ploId, offers[0].Id())
 	})
 
-	t.Run("RemoveOffer", func(t *testing.T) {
-		offers := generateUUIDs(1)
-		planId := insertTestPlan(plansRepo, t)
-		addOfferRowsAffected, addOfferErr := repo.AddOffer(planId, offers[0])
-		assertNoError(t, addOfferErr, "Failed to add offer")
+	t.Run("Update", func(t *testing.T) {
+		planId := insertTestPlan(planRepo, t)
+		offerId := fmt.Sprintf("%s", uuid.New())
+		updatedOfferId := fmt.Sprintf("%s", uuid.New())
 
-		if addOfferRowsAffected != 1 {
-			t.Errorf("Expected 1 row affected, got %d", addOfferRowsAffected)
-		}
+		ploId, createErr := planOfferRepo.Create(dataobjects.NewPlanLavatopOffer(-1, planId, offerId))
 
-		RemoveOfferRowsAffected, RemoveOfferErr := repo.RemoveOffer(planId, offers[0])
-		assertNoError(t, RemoveOfferErr, "Failed to remove offer")
-		if RemoveOfferRowsAffected != 1 {
-			t.Errorf("Expected 1 row affected, got %d", RemoveOfferRowsAffected)
-		}
+		updateErr := planOfferRepo.Update(dataobjects.NewPlanLavatopOffer(ploId, planId, updatedOfferId))
+		offers, err := planOfferRepo.GetOffers(planId)
 
-		offersAfterRemoval, err := repo.GetOfferIds(planId)
-		assertNoError(t, err, "Failed to get offer IDs after removing offer")
-		if len(offersAfterRemoval) != 0 {
-			t.Errorf("Expected no offers, got %v", offersAfterRemoval)
-		}
+		assert.Nil(t, err)
+		assert.Nil(t, createErr)
+		assert.Nil(t, updateErr)
+		assert.Equal(t, updatedOfferId, offers[0].OfferId())
+		assert.NotEqual(t, ploId, offers[0].OfferId())
+		assert.Equal(t, planId, offers[0].PlanId())
+		assert.Equal(t, ploId, offers[0].Id())
+	})
+
+	t.Run("Delete", func(t *testing.T) {
+		planId := insertTestPlan(planRepo, t)
+		offerId := fmt.Sprintf("%s", uuid.New())
+
+		ploId, createErr := planOfferRepo.Create(dataobjects.NewPlanLavatopOffer(-1, planId, offerId))
+
+		deleteErr := planOfferRepo.Delete(dataobjects.NewPlanLavatopOffer(ploId, planId, offerId))
+
+		offers, offersErr := planOfferRepo.GetOffers(planId)
+
+		assert.Nil(t, createErr)
+		assert.Nil(t, deleteErr)
+		assert.Nil(t, offersErr)
+		assert.Empty(t, offers)
 	})
 }
 
-func generateUUIDs(count int) []string {
-	uuids := make([]string, count)
-	for i := 0; i < count; i++ {
-		uuids[i] = uuid.New().String()
+func insertTestPlanOffers(repo application.PlanOfferRepository, planId, ploCount int, t *testing.T) []dataobjects.PlanLavatopOffer {
+	insertedPlos := make([]dataobjects.PlanLavatopOffer, ploCount)
+	for i := 0; i < ploCount; i++ {
+		offerId := fmt.Sprintf("%s", uuid.New())
+
+		ploId, createPloErr := repo.Create(dataobjects.NewPlanLavatopOffer(-1, planId, offerId))
+		if createPloErr != nil {
+			t.Fatal(createPloErr)
+		}
+
+		insertedPlos[i] = dataobjects.NewPlanLavatopOffer(ploId, planId, offerId)
 	}
-	return uuids
+
+	return insertedPlos
 }
