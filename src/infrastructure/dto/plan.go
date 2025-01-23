@@ -1,8 +1,9 @@
 package dto
 
 type Plan struct {
-	Name   string `json:"name"`
-	Limits Limits `json:"limits"`
+	Name     string   `json:"name"`
+	Limits   Limits   `json:"limits"`
+	Features []string `json:"features"`
 }
 
 type Limits struct {

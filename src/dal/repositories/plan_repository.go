@@ -11,6 +11,8 @@ import (
 )
 
 const (
+	planRepositoryCacheTtl = time.Hour
+
 	selectPlans = `
 SELECT id, name, limit_bytes, duration_days, created_at
 FROM plans
@@ -86,16 +88,23 @@ WHERE plans.name = $1;
 )
 
 type PlanRepository struct {
-	db *sql.DB
+	db    *sql.DB
+	cache application.CacheWithTTL[[]aggregates.Plan]
 }
 
-func NewPlansRepository(db *sql.DB) application.PlanRepository {
+func NewPlansRepository(db *sql.DB, cache application.CacheWithTTL[[]aggregates.Plan]) application.PlanRepository {
 	return &PlanRepository{
-		db: db,
+		db:    db,
+		cache: cache,
 	}
 }
 
 func (p *PlanRepository) GetAll() ([]aggregates.Plan, error) {
+	cached, cachedErr := p.cache.Get(p.allPlansCacheKey())
+	if cachedErr == nil {
+		return cached, nil
+	}
+
 	rows, err := p.db.Query(selectPlans)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query plans: %v", err)
@@ -129,10 +138,18 @@ func (p *PlanRepository) GetAll() ([]aggregates.Plan, error) {
 		return nil, fmt.Errorf("rows iteration error: %v", rows.Err())
 	}
 
+	_ = p.cache.Set(p.allPlansCacheKey(), plans)
+	_ = p.cache.Expire(p.allPlansCacheKey(), planRepositoryCacheTtl)
+
 	return plans, nil
 }
 
 func (p *PlanRepository) GetAllWithFeatures() ([]aggregates.Plan, error) {
+	cached, cachedErr := p.cache.Get(p.allPlansWithFeaturesCacheKey())
+	if cachedErr == nil {
+		return cached, nil
+	}
+
 	rows, err := p.db.Query(selectPlansWithFeatures)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query plans with features: %v", err)
@@ -199,15 +216,48 @@ func (p *PlanRepository) GetAllWithFeatures() ([]aggregates.Plan, error) {
 		plans = append(plans, plan)
 	}
 
+	_ = p.cache.Set(p.allPlansWithFeaturesCacheKey(), plans)
+	_ = p.cache.Expire(p.allPlansWithFeaturesCacheKey(), planRepositoryCacheTtl)
+
 	return plans, nil
 }
 
 func (p *PlanRepository) GetByName(name string) (aggregates.Plan, error) {
-	return p.getPlan(selectPlanByNameQuery, name)
+	cached, cachedErr := p.cache.Get(p.allPlansWithFeaturesCacheKey())
+	if cachedErr == nil && len(cached) == 1 {
+		return cached[0], nil
+	}
+
+	plan, planErr := p.getPlan(selectPlanByNameQuery, name)
+	if planErr != nil {
+		return aggregates.Plan{}, planErr
+	}
+
+	planArr := make([]aggregates.Plan, 1)
+	planArr[0] = plan
+	_ = p.cache.Set(p.planNameToCacheKey(name), planArr)
+	_ = p.cache.Expire(p.planNameToCacheKey(name), planRepositoryCacheTtl)
+
+	return plan, nil
 }
 
 func (p *PlanRepository) GetById(id int) (aggregates.Plan, error) {
-	return p.getPlan(selectPlanByIdQuery, id)
+	cached, cachedErr := p.cache.Get(p.allPlansWithFeaturesCacheKey())
+	if cachedErr == nil && len(cached) == 1 {
+		return cached[0], nil
+	}
+
+	plan, planErr := p.getPlan(selectPlanByIdQuery, id)
+	if planErr != nil {
+		return aggregates.Plan{}, planErr
+	}
+
+	planArr := make([]aggregates.Plan, 1)
+	planArr[0] = plan
+	_ = p.cache.Set(p.planIdToCacheKey(plan.Id()), planArr)
+	_ = p.cache.Expire(p.planIdToCacheKey(plan.Id()), planRepositoryCacheTtl)
+
+	return plan, nil
 }
 
 func (p *PlanRepository) getPlan(query string, args ...interface{}) (aggregates.Plan, error) {
@@ -311,4 +361,20 @@ func (p *PlanRepository) getPlanWithFeatures(query string, arg interface{}) (agg
 	}
 
 	return aggregates.NewPlan(planId, name, limitBytes, durationDays, features)
+}
+
+func (p *PlanRepository) planIdToCacheKey(id int) string {
+	return fmt.Sprintf("plan_repository:plan:%d", id)
+}
+
+func (p *PlanRepository) planNameToCacheKey(name string) string {
+	return fmt.Sprintf("plan_repository:plan:%s", name)
+}
+
+func (p *PlanRepository) allPlansCacheKey() string {
+	return "plan_repository:plan:*"
+}
+
+func (p *PlanRepository) allPlansWithFeaturesCacheKey() string {
+	return "plan_repository:plan_with_features:*"
 }

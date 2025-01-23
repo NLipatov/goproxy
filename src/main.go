@@ -10,6 +10,7 @@ import (
 	"goproxy/domain/aggregates"
 	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure"
+	"goproxy/infrastructure/api/api-http/accounting"
 	"goproxy/infrastructure/api/api-http/google_auth"
 	"goproxy/infrastructure/api/api-http/users"
 	"goproxy/infrastructure/api/api-ws"
@@ -36,6 +37,8 @@ func main() {
 		startKafkaRelay()
 	case "plan-controller":
 		startPlanController()
+	case "plan-api":
+		startPlanHttpRestApi()
 	case "google-auth":
 		startGoogleAuthController()
 	default:
@@ -102,7 +105,11 @@ func startPlanController() {
 		log.Fatalf("failed to instantiate cache service: %s", trafficCacheErr)
 	}
 
-	planRepo := repositories.NewPlansRepository(db)
+	planRepoCache, planRepoCacheErr := services.NewRedisCache[[]aggregates.Plan]()
+	if planRepoCacheErr != nil {
+		log.Fatalf("failed to instantiate cache service: %s", planRepoCacheErr)
+	}
+	planRepo := repositories.NewPlansRepository(db, planRepoCache)
 	userPlanRepo := repositories.NewUserPlanRepository(db)
 
 	userConsumedTrafficEventProcessorErr := UserConsumedTrafficEvent.NewUserConsumedTrafficEventProcessor(trafficCache, userPlanRepo, planRepo, domain.PLAN).
@@ -254,4 +261,39 @@ func startHttpRestApi() {
 
 func createBigcacheInstance() (repositories.BigCacheUserRepositoryCache, error) {
 	return repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
+}
+
+func startPlanHttpRestApi() {
+	strPort := os.Getenv("HTTP_PORT")
+	if strPort == "" {
+		log.Fatalf("'HTTP_PORT' env var must be set")
+	}
+	port, portErr := strconv.Atoi(strPort)
+	if portErr != nil {
+		log.Fatal(portErr)
+	}
+
+	db, err := dal.ConnectDB()
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cache, cacheErr := services.NewRedisCache[[]dataobjects.PlanLavatopOffer]()
+	if cacheErr != nil {
+		log.Fatalf("failed to instantiate cache service: %s", cacheErr)
+	}
+
+	planRepoCache, planRepoCacheErr := services.NewRedisCache[[]aggregates.Plan]()
+	if planRepoCacheErr != nil {
+		log.Fatalf("failed to instantiate cache service: %s", planRepoCacheErr)
+	}
+
+	billingService := services.NewLavaTopBillingService()
+	planRepository := repositories.NewPlansRepository(db, planRepoCache)
+	planOfferRepository := repositories.NewPlanLavatopOfferRepository(db, cache)
+	controller := accounting.NewAccountingController(billingService, planRepository, planOfferRepository)
+	controller.Listen(port)
 }

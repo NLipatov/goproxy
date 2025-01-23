@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"goproxy/application"
 	"goproxy/dal/repositories/mocks"
+	"goproxy/domain/aggregates"
 	"goproxy/domain/dataobjects"
 	"os"
 	"testing"
@@ -29,9 +30,10 @@ func TestPlanLavatopOfferRepository(t *testing.T) {
 		_ = db.Close()
 	}(db)
 
-	cache := mocks.NewMockCacheWithTTL[[]dataobjects.PlanLavatopOffer]()
-	planOfferRepo := NewPlanLavatopOfferRepository(db, cache)
-	planRepo := NewPlansRepository(db)
+	planOfferRepoCache := mocks.NewMockCacheWithTTL[[]dataobjects.PlanLavatopOffer]()
+	planRepoCache := mocks.NewMockCacheWithTTL[[]aggregates.Plan]()
+	planOfferRepo := NewPlanLavatopOfferRepository(db, planOfferRepoCache)
+	planRepo := NewPlansRepository(db, planRepoCache)
 
 	t.Run("GetOffers", func(t *testing.T) {
 		ploCount := 5

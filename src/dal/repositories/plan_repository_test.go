@@ -5,6 +5,7 @@ import (
 	"fmt"
 	_ "github.com/lib/pq"
 	"goproxy/application"
+	"goproxy/dal/repositories/mocks"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/valueobjects"
 	"math/rand"
@@ -29,7 +30,8 @@ func TestPlansRepository(t *testing.T) {
 		_ = db.Close()
 	}(db)
 
-	planRepository := NewPlansRepository(db)
+	planRepositoryCache := mocks.NewMockCacheWithTTL[[]aggregates.Plan]()
+	planRepository := NewPlansRepository(db, planRepositoryCache)
 
 	t.Run("GetAll", func(t *testing.T) {
 		// plan count is in [0;10] range
