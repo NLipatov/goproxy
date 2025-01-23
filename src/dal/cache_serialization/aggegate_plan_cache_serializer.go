@@ -21,11 +21,13 @@ type PlanDto struct {
 	CreatedAt  time.Time        `json:"created_at"`
 }
 
-func NewPlanCacheSerializer() CacheSerializer[aggregates.Plan, PlanDto] {
-	return &PlanDto{}
+type AggegatePlanCacheSerializer struct{}
+
+func NewAggegatePlanCacheSerializer() CacheSerializer[aggregates.Plan, PlanDto] {
+	return &AggegatePlanCacheSerializer{}
 }
 
-func (p *PlanDto) ToT(dto PlanDto) aggregates.Plan {
+func (a *AggegatePlanCacheSerializer) ToT(dto PlanDto) aggregates.Plan {
 	features := make([]valueobjects.PlanFeature, len(dto.Features))
 	for i, v := range dto.Features {
 		features[i] = valueobjects.NewPlanFeature(v.PlanId, v.FeatureName, v.FeatureDescription)
@@ -35,16 +37,16 @@ func (p *PlanDto) ToT(dto PlanDto) aggregates.Plan {
 	return plan
 }
 
-func (p *PlanDto) ToTArray(dtos []PlanDto) []aggregates.Plan {
+func (a *AggegatePlanCacheSerializer) ToTArray(dtos []PlanDto) []aggregates.Plan {
 	arr := make([]aggregates.Plan, len(dtos))
 	for i, dto := range dtos {
-		arr[i] = p.ToT(dto)
+		arr[i] = a.ToT(dto)
 	}
 
 	return arr
 }
 
-func (p *PlanDto) ToD(plan aggregates.Plan) PlanDto {
+func (a *AggegatePlanCacheSerializer) ToD(plan aggregates.Plan) PlanDto {
 	features := make([]PlanFeatureDto, len(plan.Features()))
 	for i, v := range plan.Features() {
 		features[i] = PlanFeatureDto{
@@ -63,10 +65,10 @@ func (p *PlanDto) ToD(plan aggregates.Plan) PlanDto {
 	}
 }
 
-func (p *PlanDto) ToDArray(plans []aggregates.Plan) []PlanDto {
+func (a *AggegatePlanCacheSerializer) ToDArray(plans []aggregates.Plan) []PlanDto {
 	arr := make([]PlanDto, len(plans))
 	for i, plan := range plans {
-		arr[i] = p.ToD(plan)
+		arr[i] = a.ToD(plan)
 	}
 
 	return arr

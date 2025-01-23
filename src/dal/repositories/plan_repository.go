@@ -100,7 +100,7 @@ func NewPlansRepository(db *sql.DB, cache application.CacheWithTTL[[]cache_seria
 	return &PlanRepository{
 		db:                  db,
 		cache:               cache,
-		planCacheSerializer: cache_serialization.NewPlanCacheSerializer(),
+		planCacheSerializer: cache_serialization.NewAggegatePlanCacheSerializer(),
 	}
 }
 
