@@ -3,6 +3,8 @@ package repositories
 import (
 	"database/sql"
 	_ "github.com/lib/pq"
+	"goproxy/dal/cache_serialization"
+	"goproxy/dal/repositories/mocks"
 	"goproxy/domain/aggregates"
 	"os"
 	"testing"
@@ -25,11 +27,12 @@ func TestUserPlanRepository(t *testing.T) {
 		_ = db.Close()
 	}(db)
 
-	plansRepo := NewPlansRepository(db)
+	planRepoCache := mocks.NewMockCacheWithTTL[[]cache_serialization.PlanDto]()
+	planRepo := NewPlansRepository(db, planRepoCache)
 	userPlansRepo := NewUserPlanRepository(db)
 
 	t.Run("GetById", func(t *testing.T) {
-		planId := insertTestPlan(plansRepo, t)
+		planId := insertTestPlan(planRepo, t)
 		userPlanId := insertTestUserPlan(userPlansRepo, planId, t)
 		userPlan, err := userPlansRepo.GetById(userPlanId)
 		assertNoError(t, err, "Failed to load user plan by Id")
@@ -39,7 +42,7 @@ func TestUserPlanRepository(t *testing.T) {
 	})
 
 	t.Run("Create", func(t *testing.T) {
-		planId := insertTestPlan(plansRepo, t)
+		planId := insertTestPlan(planRepo, t)
 		userPlanId := insertTestUserPlan(userPlansRepo, planId, t)
 		userPlan, err := userPlansRepo.GetById(userPlanId)
 		assertNoError(t, err, "Failed to load user plan by Id")
@@ -49,12 +52,12 @@ func TestUserPlanRepository(t *testing.T) {
 	})
 
 	t.Run("Update", func(t *testing.T) {
-		planId := insertTestPlan(plansRepo, t)
+		planId := insertTestPlan(planRepo, t)
 		userPlanId := insertTestUserPlan(userPlansRepo, planId, t)
 		userPlan, err := userPlansRepo.GetById(userPlanId)
 		assertNoError(t, err, "Failed to load user plan by Id")
 
-		newPlanId := insertTestPlan(plansRepo, t)
+		newPlanId := insertTestPlan(planRepo, t)
 		newUserId := userPlan.UserId() + 1
 		newValidTo := userPlan.ValidTo().Add(time.Second * 5)
 		updatedUserPlan, _ := aggregates.NewUserPlan(userPlanId, newUserId, newPlanId, newValidTo, time.Now())
@@ -66,7 +69,7 @@ func TestUserPlanRepository(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
-		planId := insertTestPlan(plansRepo, t)
+		planId := insertTestPlan(planRepo, t)
 		userPlanId := insertTestUserPlan(userPlansRepo, planId, t)
 		userPlan, err := userPlansRepo.GetById(userPlanId)
 		assertNoError(t, err, "Failed to load user plan by Id")

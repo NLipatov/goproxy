@@ -5,6 +5,8 @@ import (
 	"fmt"
 	_ "github.com/lib/pq"
 	"goproxy/application"
+	"goproxy/dal/cache_serialization"
+	"goproxy/dal/repositories/mocks"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/valueobjects"
 	"math/rand"
@@ -29,7 +31,69 @@ func TestPlansRepository(t *testing.T) {
 		_ = db.Close()
 	}(db)
 
-	planRepository := NewPlansRepository(db)
+	planRepositoryCache := mocks.NewMockCacheWithTTL[[]cache_serialization.PlanDto]()
+	planRepository := NewPlansRepository(db, planRepositoryCache)
+
+	t.Run("GetAll", func(t *testing.T) {
+		// plan count is in [0;10] range
+		planCount := rand.Intn(9) + 1
+		expectedPlanIds := make([]int, planCount)
+
+		for i := 0; i < planCount; i++ {
+			expectedPlanIds[i] = insertTestPlan(planRepository, t)
+		}
+
+		plans, plansErr := planRepository.GetAll()
+		if plansErr != nil {
+			t.Fatal(plansErr)
+		}
+
+		actualPlanIds := make(map[int]bool)
+		for _, v := range plans {
+			actualPlanIds[v.Id()] = true
+		}
+
+		for _, v := range expectedPlanIds {
+			if !actualPlanIds[v] {
+				t.Errorf("plan %d not found in expected plans", v)
+			}
+		}
+	})
+
+	t.Run("GetAllWithFeatures", func(t *testing.T) {
+		// plan count is in [0;10] range
+		planCount := rand.Intn(9) + 1
+		expectedPlanIds := make(map[int]int, planCount)
+		expectedPlanFeatureCount := make(map[int]int, planCount)
+
+		for i := 0; i < planCount; i++ {
+			featureCount := i + 1
+			expectedPlanIds[i] = insertTestPlanWithFeatures(db, planRepository, t, featureCount)
+			expectedPlanFeatureCount[expectedPlanIds[i]] = featureCount
+		}
+
+		plans, plansErr := planRepository.GetAllWithFeatures()
+		if plansErr != nil {
+			t.Fatal(plansErr)
+		}
+
+		actualPlanIds := make(map[int]aggregates.Plan)
+		for _, v := range plans {
+			actualPlanIds[v.Id()] = v
+		}
+
+		for _, id := range expectedPlanIds {
+			actualPlan, exists := actualPlanIds[id]
+			if !exists {
+				t.Errorf("plan %d not found in expected plans", actualPlan.Id())
+			}
+
+			expectedFeatureCount := expectedPlanFeatureCount[id]
+			if len(actualPlan.Features()) != expectedFeatureCount {
+				t.Fatalf("Expected plan %d to have %d features, gor %d features", id, expectedFeatureCount, len(actualPlan.Features()))
+			}
+		}
+	})
 
 	t.Run("GetByName", func(t *testing.T) {
 		planId := insertTestPlan(planRepository, t)
@@ -86,22 +150,26 @@ func TestPlansRepository(t *testing.T) {
 	})
 
 	t.Run("GetByIdWithFeatures", func(t *testing.T) {
-		planId := insertTestPlanWithFeatures(db, planRepository, t)
+		featureCount := rand.Intn(9) + 1
+		planId := insertTestPlanWithFeatures(db, planRepository, t, featureCount)
 		plan, err := planRepository.GetByIdWithFeatures(planId)
-		assertNoError(t, err, "Failed to load plan with features by Id")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		if len(plan.Features()) == 0 {
-			t.Errorf("Expected features for plan with id %d, but got none", planId)
+		if len(plan.Features()) != featureCount {
+			t.Fatalf("Expected plan %d to have %d features, gor %d features", plan.Id(), featureCount, len(plan.Features()))
 		}
 	})
 
 	t.Run("GetByNameWithFeatures", func(t *testing.T) {
-		planId := insertTestPlanWithFeatures(db, planRepository, t)
+		featureCount := rand.Intn(9) + 1
+		planId := insertTestPlanWithFeatures(db, planRepository, t, featureCount)
 		plan, planErr := planRepository.GetById(planId)
 		plan, err := planRepository.GetByNameWithFeatures(plan.Name())
 
-		if len(plan.Features()) == 0 {
-			t.Errorf("Expected features for plan with name %s, but got none", plan.Name())
+		if len(plan.Features()) != featureCount {
+			t.Fatalf("Expected plan %d to have %d features, gor %d features", plan.Id(), featureCount, len(plan.Features()))
 		}
 
 		assertNoError(t, planErr, "Failed to load plan by Id")
@@ -154,7 +222,7 @@ func assertPlansNotEqual(t *testing.T, expected, actual aggregates.Plan) {
 	}
 }
 
-func insertTestPlanWithFeatures(db *sql.DB, repo application.PlanRepository, t *testing.T) int {
+func insertTestPlanWithFeatures(db *sql.DB, repo application.PlanRepository, t *testing.T, featureCount int) int {
 	name := fmt.Sprintf("Test Plan With Features %d", time.Now().UTC().UnixNano())
 	plan, err := aggregates.NewPlan(-1, name, time.Now().UnixMilli(), time.Now().Day(), make([]valueobjects.PlanFeature, 0))
 	assertNoError(t, err, "Failed to create test plan")
@@ -162,7 +230,7 @@ func insertTestPlanWithFeatures(db *sql.DB, repo application.PlanRepository, t *
 	planId, err := repo.Create(plan)
 	assertNoError(t, err, "Failed to insert test plan")
 
-	addFeaturesToPlan(db, t, planId, rand.Intn(10)+1) // 1 is added because rand.Intn min value is 0
+	addFeaturesToPlan(db, t, planId, featureCount)
 
 	return planId
 }
@@ -177,11 +245,15 @@ func addFeaturesToPlan(db *sql.DB, t *testing.T, planId int, featureCount int) {
 			INSERT INTO features (name, description) 
 			VALUES ($1, $2) 
 			RETURNING id`, featureName, featureDescription).Scan(&featureId)
-		assertNoError(t, insertErr, "Failed to insert feature")
+		if insertErr != nil {
+			t.Fatal(insertErr)
+		}
 
 		_, linkErr := db.Exec(`
 			INSERT INTO plan_features (plan_id, feature_id) 
 			VALUES ($1, $2)`, planId, featureId)
-		assertNoError(t, linkErr, "Failed to link feature to plan")
+		if linkErr != nil {
+			t.Fatal(linkErr)
+		}
 	}
 }

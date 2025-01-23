@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"goproxy/application"
 	"goproxy/dal"
+	"goproxy/dal/cache_serialization"
 	"goproxy/dal/repositories"
 	"goproxy/domain"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure"
+	"goproxy/infrastructure/api/api-http/accounting"
 	"goproxy/infrastructure/api/api-http/google_auth"
 	"goproxy/infrastructure/api/api-http/users"
 	"goproxy/infrastructure/api/api-ws"
@@ -36,6 +38,8 @@ func main() {
 		startKafkaRelay()
 	case "plan-controller":
 		startPlanController()
+	case "plan-api":
+		startPlanHttpRestApi()
 	case "google-auth":
 		startGoogleAuthController()
 	default:
@@ -102,7 +106,11 @@ func startPlanController() {
 		log.Fatalf("failed to instantiate cache service: %s", trafficCacheErr)
 	}
 
-	planRepo := repositories.NewPlansRepository(db)
+	planRepoCache, planRepoCacheErr := services.NewRedisCache[[]cache_serialization.PlanDto]()
+	if planRepoCacheErr != nil {
+		log.Fatalf("failed to instantiate cache service: %s", planRepoCacheErr)
+	}
+	planRepo := repositories.NewPlansRepository(db, planRepoCache)
 	userPlanRepo := repositories.NewUserPlanRepository(db)
 
 	userConsumedTrafficEventProcessorErr := UserConsumedTrafficEvent.NewUserConsumedTrafficEventProcessor(trafficCache, userPlanRepo, planRepo, domain.PLAN).
@@ -254,4 +262,45 @@ func startHttpRestApi() {
 
 func createBigcacheInstance() (repositories.BigCacheUserRepositoryCache, error) {
 	return repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
+}
+
+func startPlanHttpRestApi() {
+	strPort := os.Getenv("HTTP_PORT")
+	if strPort == "" {
+		log.Fatalf("'HTTP_PORT' env var must be set")
+	}
+	port, portErr := strconv.Atoi(strPort)
+	if portErr != nil {
+		log.Fatal(portErr)
+	}
+
+	db, err := dal.ConnectDB()
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cache, cacheErr := services.NewRedisCache[[]cache_serialization.PlanLavatopOfferDto]()
+	if cacheErr != nil {
+		log.Fatalf("failed to instantiate cache service: %s", cacheErr)
+	}
+
+	planRepoCache, planRepoCacheErr := services.NewRedisCache[[]cache_serialization.PlanDto]()
+	if planRepoCacheErr != nil {
+		log.Fatalf("failed to instantiate cache service: %s", planRepoCacheErr)
+	}
+
+	lavaTopUseCasesCache, lavaTopUseCasesCacheErr := services.NewRedisCache[[]cache_serialization.LavaTopOfferDto]()
+	if lavaTopUseCasesCacheErr != nil {
+		log.Fatalf("failed to instantiate cache_serialization service: %s", lavaTopUseCasesCacheErr)
+	}
+
+	billingService := services.NewLavaTopBillingService()
+	planRepository := repositories.NewPlansRepository(db, planRepoCache)
+	planOfferRepository := repositories.NewPlanLavatopOfferRepository(db, cache)
+	lavaTopUseCases := application.NewLavaTopUseCases(billingService, lavaTopUseCasesCache)
+	controller := accounting.NewAccountingController(billingService, planRepository, planOfferRepository, lavaTopUseCases)
+	controller.Listen(port)
 }
