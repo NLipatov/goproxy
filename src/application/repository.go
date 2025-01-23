@@ -28,7 +28,8 @@ type EventRepository interface {
 
 type PlanRepository interface {
 	Repository[aggregates.Plan]
-	GetAll() (aggregates.Plan, error)
+	GetAll() ([]aggregates.Plan, error)
+	GetAllWithFeatures() ([]aggregates.Plan, error)
 	GetByName(name string) (aggregates.Plan, error)
 	GetByNameWithFeatures(name string) (aggregates.Plan, error)
 	GetByIdWithFeatures(id int) (aggregates.Plan, error)

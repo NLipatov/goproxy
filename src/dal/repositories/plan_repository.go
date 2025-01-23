@@ -16,6 +16,20 @@ SELECT id, name, limit_bytes, duration_days, created_at
 FROM plans
 `
 
+	selectPlansWithFeatures = `
+SELECT
+    plans.id AS plan_id,
+    plans.name,
+    plans.limit_bytes,
+    plans.duration_days,
+    features.name AS feature_name,
+    features.description AS feature_description,
+    plans.created_at
+FROM plans
+    LEFT JOIN plan_features ON plans.id = plan_features.plan_id
+    LEFT JOIN features ON plan_features.feature_id = features.id;
+`
+
 	selectPlanByNameQuery = `
 SELECT id, name, limit_bytes, duration_days, created_at 
 FROM plans.public.plans 
@@ -81,8 +95,111 @@ func NewPlansRepository(db *sql.DB) application.PlanRepository {
 	}
 }
 
-func (p *PlanRepository) GetAll() (aggregates.Plan, error) {
-	return p.getPlan(selectPlans)
+func (p *PlanRepository) GetAll() ([]aggregates.Plan, error) {
+	rows, err := p.db.Query(selectPlans)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query plans: %v", err)
+	}
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
+
+	var plans []aggregates.Plan
+	for rows.Next() {
+		var id int
+		var name string
+		var limitBytes int64
+		var durationDays int
+		var createdAt time.Time
+
+		err = rows.Scan(&id, &name, &limitBytes, &durationDays, &createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %v", err)
+		}
+
+		plan, err := aggregates.NewPlan(id, name, limitBytes, durationDays, []valueobjects.PlanFeature{})
+		if err != nil {
+			fmt.Printf("plan validation err (invalid plan stored in db?): %s, plan id: %d\n", err, id)
+			continue
+		}
+		plans = append(plans, plan)
+	}
+
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("rows iteration error: %v", rows.Err())
+	}
+
+	return plans, nil
+}
+
+func (p *PlanRepository) GetAllWithFeatures() ([]aggregates.Plan, error) {
+	rows, err := p.db.Query(selectPlansWithFeatures)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query plans with features: %v", err)
+	}
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
+
+	type planData struct {
+		id         int
+		name       string
+		limitBytes int64
+		duration   int
+		createdAt  time.Time
+		features   []valueobjects.PlanFeature
+	}
+
+	plansMap := make(map[int]*planData)
+
+	for rows.Next() {
+		var planId int
+		var name string
+		var limitBytes int64
+		var durationDays int
+		var createdAt time.Time
+		var featureName sql.NullString
+		var featureDescription sql.NullString
+
+		err = rows.Scan(&planId, &name, &limitBytes, &durationDays, &featureName, &featureDescription, &createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %v", err)
+		}
+
+		plan, exists := plansMap[planId]
+		if !exists {
+			plansMap[planId] = &planData{
+				id:         planId,
+				name:       name,
+				limitBytes: limitBytes,
+				duration:   durationDays,
+				createdAt:  createdAt,
+				features:   []valueobjects.PlanFeature{},
+			}
+			plan = plansMap[planId]
+		}
+
+		if featureName.Valid {
+			feature := valueobjects.NewPlanFeature(planId, featureName.String)
+			plan.features = append(plan.features, feature)
+		}
+	}
+
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("rows iteration error: %v", rows.Err())
+	}
+
+	var plans []aggregates.Plan
+	for _, data := range plansMap {
+		plan, err := aggregates.NewPlan(data.id, data.name, data.limitBytes, data.duration, data.features)
+		if err != nil {
+			fmt.Printf("plan validation err (invalid plan data?): %s, plan id: %d\n", err, data.id)
+			continue
+		}
+		plans = append(plans, plan)
+	}
+
+	return plans, nil
 }
 
 func (p *PlanRepository) GetByName(name string) (aggregates.Plan, error) {
