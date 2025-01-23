@@ -20,8 +20,8 @@ type Controller struct {
 func NewAccountingController(
 	billingService application.BillingService[lavatopaggregates.Invoice,
 		lavatopvalueobjects.Offer], planRepository application.PlanRepository,
-	planOfferRepository application.PlanOfferRepository) *Controller {
-	handler := lavatop.NewHandler(billingService, planRepository, planOfferRepository)
+	planOfferRepository application.PlanOfferRepository, lavaTopUseCases application.LavaTopUseCases) *Controller {
+	handler := lavatop.NewHandler(billingService, planRepository, planOfferRepository, lavaTopUseCases)
 	return &Controller{
 		handler:     handler,
 		corsManager: CORS.NewCORSManager(),

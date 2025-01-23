@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"goproxy/application"
+	"goproxy/dal/cache_serialization"
 	"goproxy/domain/dataobjects"
 	"time"
 )
@@ -35,15 +36,17 @@ WHERE id = $1
 )
 
 type PlanLavatopOfferRepository struct {
-	db    *sql.DB
-	cache application.CacheWithTTL[[]dataobjects.PlanLavatopOffer]
+	db                              *sql.DB
+	cache                           application.CacheWithTTL[[]cache_serialization.PlanLavatopOfferDto]
+	cachePlanLavatopOfferSerializer cache_serialization.CacheSerializer[dataobjects.PlanLavatopOffer, cache_serialization.PlanLavatopOfferDto]
 }
 
 func NewPlanLavatopOfferRepository(db *sql.DB,
-	cache application.CacheWithTTL[[]dataobjects.PlanLavatopOffer]) application.PlanOfferRepository {
+	cache application.CacheWithTTL[[]cache_serialization.PlanLavatopOfferDto]) application.PlanOfferRepository {
 	return &PlanLavatopOfferRepository{
-		db:    db,
-		cache: cache,
+		db:                              db,
+		cache:                           cache,
+		cachePlanLavatopOfferSerializer: cache_serialization.NewPlanLavatopOfferSerializer(),
 	}
 }
 
@@ -51,7 +54,7 @@ func (p *PlanLavatopOfferRepository) GetOffers(planId int) ([]dataobjects.PlanLa
 	planKey := p.planToCacheKey(planId)
 	cached, cachedErr := p.cache.Get(planKey)
 	if cachedErr == nil {
-		return cached, nil
+		return p.cachePlanLavatopOfferSerializer.ToTArray(cached), nil
 	}
 
 	var offers []dataobjects.PlanLavatopOffer
@@ -81,7 +84,7 @@ func (p *PlanLavatopOfferRepository) GetOffers(planId int) ([]dataobjects.PlanLa
 		return make([]dataobjects.PlanLavatopOffer, 0), rows.Err()
 	}
 
-	_ = p.cache.Set(planKey, offers)
+	_ = p.cache.Set(planKey, p.cachePlanLavatopOfferSerializer.ToDArray(offers))
 	_ = p.cache.Expire(planKey, cacheTtl)
 
 	if offers == nil {

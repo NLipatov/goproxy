@@ -3,6 +3,7 @@ package repositories
 import (
 	"database/sql"
 	_ "github.com/lib/pq"
+	"goproxy/dal/cache_serialization"
 	"goproxy/dal/repositories/mocks"
 	"goproxy/domain/aggregates"
 	"os"
@@ -26,7 +27,7 @@ func TestUserPlanRepository(t *testing.T) {
 		_ = db.Close()
 	}(db)
 
-	planRepoCache := mocks.NewMockCacheWithTTL[[]aggregates.Plan]()
+	planRepoCache := mocks.NewMockCacheWithTTL[[]cache_serialization.PlanDto]()
 	planRepo := NewPlansRepository(db, planRepoCache)
 	userPlansRepo := NewUserPlanRepository(db)
 

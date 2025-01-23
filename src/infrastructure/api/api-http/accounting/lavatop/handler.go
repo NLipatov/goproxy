@@ -17,14 +17,17 @@ type Handler struct {
 	userUseCases        application.UserUseCases
 	plansRepository     application.PlanRepository
 	planOfferRepository application.PlanOfferRepository
+	lavaTopUseCases     application.LavaTopUseCases
 }
 
 func NewHandler(billingService application.BillingService[lavatopaggregates.Invoice, lavatopvalueobjects.Offer],
-	planRepository application.PlanRepository, planOfferRepository application.PlanOfferRepository) *Handler {
+	planRepository application.PlanRepository, planOfferRepository application.PlanOfferRepository,
+	lavaTopUseCases application.LavaTopUseCases) *Handler {
 	return &Handler{
 		billingService:      billingService,
 		plansRepository:     planRepository,
 		planOfferRepository: planOfferRepository,
+		lavaTopUseCases:     lavaTopUseCases,
 	}
 }
 
@@ -134,12 +137,63 @@ func (h Handler) GetPlans(w http.ResponseWriter, _ *http.Request) {
 		}
 		planFeatures[plan.Id()] = features
 	}
+
+	planPrices := make(map[int][]dto.Price)
+	lavatopOffers, lavatopOffersErr := h.lavaTopUseCases.GetOffers()
+	if lavatopOffersErr == nil {
+
+		for _, plan := range plans {
+			planOfferIds, offersErr := h.planOfferRepository.GetOffers(plan.Id())
+			if offersErr != nil {
+				continue
+			}
+
+			for _, offer := range lavatopOffers {
+				for _, planOffers := range planOfferIds {
+					if offer.ExtId() == planOffers.OfferId() {
+						for _, v := range offer.Prices() {
+							priceDto := dto.Price{
+								Currency: v.Currency().String(),
+								Cents:    v.Cents(),
+							}
+							planPrices[plan.Id()] = append(planPrices[plan.Id()], priceDto)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	planResponses := make([]dto.Plan, len(plans))
 	for i, plan := range plans {
+		features := make([]dto.Feature, len(plan.Features()))
+		for fi, feature := range plan.Features() {
+			features[fi] = dto.Feature{
+				Feature:            feature.Feature(),
+				FeatureDescription: feature.Description(),
+			}
+		}
+
 		planResponses[i] = dto.Plan{
-			Name:     plan.Name(),
-			Limits:   dto.Limits{},
-			Features: planFeatures[plan.Id()],
+			Name: plan.Name(),
+			Limits: dto.Limits{
+				Bandwidth: dto.BandwidthLimit{
+					IsLimited: plan.LimitBytes() != 0,
+					Used:      0,
+					Total:     plan.LimitBytes(),
+				},
+				Connections: dto.ConnectionLimit{
+					IsLimited:                true,
+					MaxConcurrentConnections: 25,
+				},
+				Speed: dto.SpeedLimit{
+					IsLimited:         false,
+					MaxBytesPerSecond: 125_000_000, // 125_000_000 bytes is 1 Gigabit/s
+				},
+			},
+			Features:     features,
+			DurationDays: plan.DurationDays(),
+			Prices:       planPrices[plan.Id()],
 		}
 	}
 

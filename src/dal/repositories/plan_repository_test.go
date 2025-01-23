@@ -5,6 +5,7 @@ import (
 	"fmt"
 	_ "github.com/lib/pq"
 	"goproxy/application"
+	"goproxy/dal/cache_serialization"
 	"goproxy/dal/repositories/mocks"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/valueobjects"
@@ -30,7 +31,7 @@ func TestPlansRepository(t *testing.T) {
 		_ = db.Close()
 	}(db)
 
-	planRepositoryCache := mocks.NewMockCacheWithTTL[[]aggregates.Plan]()
+	planRepositoryCache := mocks.NewMockCacheWithTTL[[]cache_serialization.PlanDto]()
 	planRepository := NewPlansRepository(db, planRepositoryCache)
 
 	t.Run("GetAll", func(t *testing.T) {

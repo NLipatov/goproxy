@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"goproxy/application"
 	"goproxy/dal"
+	"goproxy/dal/cache_serialization"
 	"goproxy/dal/repositories"
 	"goproxy/domain"
 	"goproxy/domain/aggregates"
@@ -105,7 +106,7 @@ func startPlanController() {
 		log.Fatalf("failed to instantiate cache service: %s", trafficCacheErr)
 	}
 
-	planRepoCache, planRepoCacheErr := services.NewRedisCache[[]aggregates.Plan]()
+	planRepoCache, planRepoCacheErr := services.NewRedisCache[[]cache_serialization.PlanDto]()
 	if planRepoCacheErr != nil {
 		log.Fatalf("failed to instantiate cache service: %s", planRepoCacheErr)
 	}
@@ -281,19 +282,25 @@ func startPlanHttpRestApi() {
 		log.Fatal(err)
 	}
 
-	cache, cacheErr := services.NewRedisCache[[]dataobjects.PlanLavatopOffer]()
+	cache, cacheErr := services.NewRedisCache[[]cache_serialization.PlanLavatopOfferDto]()
 	if cacheErr != nil {
 		log.Fatalf("failed to instantiate cache service: %s", cacheErr)
 	}
 
-	planRepoCache, planRepoCacheErr := services.NewRedisCache[[]aggregates.Plan]()
+	planRepoCache, planRepoCacheErr := services.NewRedisCache[[]cache_serialization.PlanDto]()
 	if planRepoCacheErr != nil {
 		log.Fatalf("failed to instantiate cache service: %s", planRepoCacheErr)
+	}
+
+	lavaTopUseCasesCache, lavaTopUseCasesCacheErr := services.NewRedisCache[[]cache_serialization.LavaTopOfferDto]()
+	if lavaTopUseCasesCacheErr != nil {
+		log.Fatalf("failed to instantiate cache_serialization service: %s", lavaTopUseCasesCacheErr)
 	}
 
 	billingService := services.NewLavaTopBillingService()
 	planRepository := repositories.NewPlansRepository(db, planRepoCache)
 	planOfferRepository := repositories.NewPlanLavatopOfferRepository(db, cache)
-	controller := accounting.NewAccountingController(billingService, planRepository, planOfferRepository)
+	lavaTopUseCases := application.NewLavaTopUseCases(billingService, lavaTopUseCasesCache)
+	controller := accounting.NewAccountingController(billingService, planRepository, planOfferRepository, lavaTopUseCases)
 	controller.Listen(port)
 }

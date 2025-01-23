@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"goproxy/application"
+	"goproxy/dal/cache_serialization"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/valueobjects"
 	"time"
@@ -63,6 +64,7 @@ SELECT
     plans.limit_bytes,
     plans.duration_days,
     features.id AS feature_id,
+    features.name AS feature_name,
     features.description AS feature_description,
     plans.created_at
 FROM plans
@@ -78,6 +80,7 @@ SELECT
     plans.limit_bytes,
     plans.duration_days,
     features.id AS feature_id,
+    features.name AS feature_name,
     features.description AS feature_description,
     plans.created_at
 FROM plans
@@ -88,21 +91,23 @@ WHERE plans.name = $1;
 )
 
 type PlanRepository struct {
-	db    *sql.DB
-	cache application.CacheWithTTL[[]aggregates.Plan]
+	db                  *sql.DB
+	cache               application.CacheWithTTL[[]cache_serialization.PlanDto]
+	planCacheSerializer cache_serialization.CacheSerializer[aggregates.Plan, cache_serialization.PlanDto]
 }
 
-func NewPlansRepository(db *sql.DB, cache application.CacheWithTTL[[]aggregates.Plan]) application.PlanRepository {
+func NewPlansRepository(db *sql.DB, cache application.CacheWithTTL[[]cache_serialization.PlanDto]) application.PlanRepository {
 	return &PlanRepository{
-		db:    db,
-		cache: cache,
+		db:                  db,
+		cache:               cache,
+		planCacheSerializer: cache_serialization.NewPlanCacheSerializer(),
 	}
 }
 
 func (p *PlanRepository) GetAll() ([]aggregates.Plan, error) {
 	cached, cachedErr := p.cache.Get(p.allPlansCacheKey())
 	if cachedErr == nil {
-		return cached, nil
+		return p.planCacheSerializer.ToTArray(cached), nil
 	}
 
 	rows, err := p.db.Query(selectPlans)
@@ -138,7 +143,7 @@ func (p *PlanRepository) GetAll() ([]aggregates.Plan, error) {
 		return nil, fmt.Errorf("rows iteration error: %v", rows.Err())
 	}
 
-	_ = p.cache.Set(p.allPlansCacheKey(), plans)
+	_ = p.cache.Set(p.allPlansCacheKey(), p.planCacheSerializer.ToDArray(plans))
 	_ = p.cache.Expire(p.allPlansCacheKey(), planRepositoryCacheTtl)
 
 	return plans, nil
@@ -147,7 +152,7 @@ func (p *PlanRepository) GetAll() ([]aggregates.Plan, error) {
 func (p *PlanRepository) GetAllWithFeatures() ([]aggregates.Plan, error) {
 	cached, cachedErr := p.cache.Get(p.allPlansWithFeaturesCacheKey())
 	if cachedErr == nil {
-		return cached, nil
+		return p.planCacheSerializer.ToTArray(cached), nil
 	}
 
 	rows, err := p.db.Query(selectPlansWithFeatures)
@@ -197,7 +202,7 @@ func (p *PlanRepository) GetAllWithFeatures() ([]aggregates.Plan, error) {
 		}
 
 		if featureName.Valid {
-			feature := valueobjects.NewPlanFeature(planId, featureName.String)
+			feature := valueobjects.NewPlanFeature(planId, featureName.String, featureDescription.String)
 			plan.features = append(plan.features, feature)
 		}
 	}
@@ -216,7 +221,7 @@ func (p *PlanRepository) GetAllWithFeatures() ([]aggregates.Plan, error) {
 		plans = append(plans, plan)
 	}
 
-	_ = p.cache.Set(p.allPlansWithFeaturesCacheKey(), plans)
+	_ = p.cache.Set(p.allPlansWithFeaturesCacheKey(), p.planCacheSerializer.ToDArray(plans))
 	_ = p.cache.Expire(p.allPlansWithFeaturesCacheKey(), planRepositoryCacheTtl)
 
 	return plans, nil
@@ -225,7 +230,7 @@ func (p *PlanRepository) GetAllWithFeatures() ([]aggregates.Plan, error) {
 func (p *PlanRepository) GetByName(name string) (aggregates.Plan, error) {
 	cached, cachedErr := p.cache.Get(p.allPlansWithFeaturesCacheKey())
 	if cachedErr == nil && len(cached) == 1 {
-		return cached[0], nil
+		return p.planCacheSerializer.ToT(cached[0]), nil
 	}
 
 	plan, planErr := p.getPlan(selectPlanByNameQuery, name)
@@ -235,7 +240,7 @@ func (p *PlanRepository) GetByName(name string) (aggregates.Plan, error) {
 
 	planArr := make([]aggregates.Plan, 1)
 	planArr[0] = plan
-	_ = p.cache.Set(p.planNameToCacheKey(name), planArr)
+	_ = p.cache.Set(p.planNameToCacheKey(name), p.planCacheSerializer.ToDArray(planArr))
 	_ = p.cache.Expire(p.planNameToCacheKey(name), planRepositoryCacheTtl)
 
 	return plan, nil
@@ -244,7 +249,7 @@ func (p *PlanRepository) GetByName(name string) (aggregates.Plan, error) {
 func (p *PlanRepository) GetById(id int) (aggregates.Plan, error) {
 	cached, cachedErr := p.cache.Get(p.allPlansWithFeaturesCacheKey())
 	if cachedErr == nil && len(cached) == 1 {
-		return cached[0], nil
+		return p.planCacheSerializer.ToT(cached[0]), nil
 	}
 
 	plan, planErr := p.getPlan(selectPlanByIdQuery, id)
@@ -254,7 +259,7 @@ func (p *PlanRepository) GetById(id int) (aggregates.Plan, error) {
 
 	planArr := make([]aggregates.Plan, 1)
 	planArr[0] = plan
-	_ = p.cache.Set(p.planIdToCacheKey(plan.Id()), planArr)
+	_ = p.cache.Set(p.planIdToCacheKey(plan.Id()), p.planCacheSerializer.ToDArray(planArr))
 	_ = p.cache.Expire(p.planIdToCacheKey(plan.Id()), planRepositoryCacheTtl)
 
 	return plan, nil
@@ -341,9 +346,10 @@ func (p *PlanRepository) getPlanWithFeatures(query string, arg interface{}) (agg
 
 	for rows.Next() {
 		var featureId sql.NullInt64
+		var featureName sql.NullString
 		var featureDescription sql.NullString
 
-		err = rows.Scan(&planId, &name, &limitBytes, &durationDays, &featureId, &featureDescription, &createdAt)
+		err = rows.Scan(&planId, &name, &limitBytes, &durationDays, &featureId, &featureName, &featureDescription, &createdAt)
 		if err != nil {
 			return aggregates.Plan{}, fmt.Errorf("failed to scan row (query: %s, arg: %v): %w", query, arg, err)
 		}
@@ -351,7 +357,7 @@ func (p *PlanRepository) getPlanWithFeatures(query string, arg interface{}) (agg
 		if featureDescription.Valid {
 			if featureId.Valid {
 				pId := int(featureId.Int64)
-				features = append(features, valueobjects.NewPlanFeature(pId, featureDescription.String))
+				features = append(features, valueobjects.NewPlanFeature(pId, featureName.String, featureDescription.String))
 			}
 		}
 	}
