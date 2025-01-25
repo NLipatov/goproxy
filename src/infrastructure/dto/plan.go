@@ -5,7 +5,13 @@ type Plan struct {
 	Limits       Limits    `json:"limits"`
 	Features     []Feature `json:"features"`
 	DurationDays int       `json:"duration_days"`
-	Prices       []Price   `json:"prices"`
+	Offers       []Offer   `json:"offers"`
+}
+
+type Offer struct {
+	Description string  `json:"description"`
+	OfferId     string  `json:"offer_id"`
+	Prices      []Price `json:"prices"`
 }
 
 type Feature struct {
@@ -14,8 +20,9 @@ type Feature struct {
 }
 
 type Price struct {
-	Cents    int64  `json:"cents"`
-	Currency string `json:"currency"`
+	Cents          int64    `json:"cents"`
+	Currency       string   `json:"currency"`
+	PaymentMethods []string `json:"payment_method"`
 }
 
 type Limits struct {

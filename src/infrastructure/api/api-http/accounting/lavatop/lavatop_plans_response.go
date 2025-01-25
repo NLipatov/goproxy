@@ -3,6 +3,7 @@ package lavatop
 import (
 	"goproxy/application"
 	"goproxy/domain/aggregates"
+	"goproxy/domain/lavatopsubdomain/lavatopvalueobjects"
 	"goproxy/domain/valueobjects"
 	"goproxy/infrastructure/dto"
 )
@@ -28,7 +29,7 @@ func (h *PlansResponse) Build() (dto.ApiResponse[[]dto.Plan], error) {
 		return dto.ApiResponse[[]dto.Plan]{}, err
 	}
 
-	planPrices := h.extractPlanPrices(plans)
+	planOffers := h.extractPlanOffers(plans)
 
 	response := dto.ApiResponse[[]dto.Plan]{
 		Payload:      nil,
@@ -36,16 +37,16 @@ func (h *PlansResponse) Build() (dto.ApiResponse[[]dto.Plan], error) {
 		ErrorMessage: "",
 	}
 
-	response.Payload = h.buildPlanResponses(plans, planPrices)
+	response.Payload = h.buildPlanResponses(plans, planOffers)
 
 	return response, nil
 }
 
-func (h *PlansResponse) extractPlanPrices(plans []aggregates.Plan) map[int][]dto.Price {
-	planPrices := make(map[int][]dto.Price)
+func (h *PlansResponse) extractPlanOffers(plans []aggregates.Plan) map[int][]dto.Offer {
+	planOffers := make(map[int][]dto.Offer)
 	lavatopOffers, lavatopOffersErr := h.lavaTopUseCases.GetOffers()
 	if lavatopOffersErr != nil {
-		return planPrices
+		return planOffers
 	}
 
 	for _, plan := range plans {
@@ -57,26 +58,56 @@ func (h *PlansResponse) extractPlanPrices(plans []aggregates.Plan) map[int][]dto
 		for _, offer := range lavatopOffers {
 			for _, planOffer := range planOfferIds {
 				if offer.ExtId() == planOffer.OfferId() {
-					for _, price := range offer.Prices() {
-						planPrices[plan.Id()] = append(planPrices[plan.Id()], dto.Price{
-							Currency: price.Currency().String(),
-							Cents:    price.Cents(),
-						})
+
+					prices := make([]dto.Price, len(offer.Prices()))
+					for i, price := range offer.Prices() {
+						var paymentMethods []string
+						switch price.Currency() {
+						case lavatopvalueobjects.RUB:
+							paymentMethods = make([]string, 1)
+							paymentMethods[0] = "BANK131"
+
+						case lavatopvalueobjects.USD:
+							paymentMethods = make([]string, 3)
+							paymentMethods[0] = "PAYPAL"
+							paymentMethods[1] = "UNLIMINT"
+							paymentMethods[2] = "STRIPE"
+
+						case lavatopvalueobjects.EUR:
+							paymentMethods = make([]string, 3)
+							paymentMethods[0] = "PAYPAL"
+							paymentMethods[1] = "UNLIMINT"
+							paymentMethods[2] = "STRIPE"
+
+						default:
+							continue
+						}
+
+						prices[i] = dto.Price{
+							Cents:          price.Cents(),
+							Currency:       price.Currency().String(),
+							PaymentMethods: paymentMethods,
+						}
 					}
+
+					planOffers[plan.Id()] = append(planOffers[plan.Id()], dto.Offer{
+						Description: "",
+						OfferId:     offer.ExtId(),
+						Prices:      prices,
+					})
 				}
 			}
 		}
 	}
 
-	return planPrices
+	return planOffers
 }
 
-func (h *PlansResponse) buildPlanResponses(plans []aggregates.Plan, planPrices map[int][]dto.Price) *[]dto.Plan {
+func (h *PlansResponse) buildPlanResponses(plans []aggregates.Plan, planOffers map[int][]dto.Offer) *[]dto.Plan {
 	planResponses := make([]dto.Plan, len(plans))
 
 	for i, plan := range plans {
 		features := h.buildFeatures(plan.Features())
-		prices := h.getPlanPrices(plan.Id(), planPrices)
 
 		planResponses[i] = dto.Plan{
 			Name: plan.Name(),
@@ -97,7 +128,7 @@ func (h *PlansResponse) buildPlanResponses(plans []aggregates.Plan, planPrices m
 			},
 			Features:     features,
 			DurationDays: plan.DurationDays(),
-			Prices:       prices,
+			Offers:       planOffers[plan.Id()],
 		}
 	}
 
@@ -127,16 +158,4 @@ func (h *PlansResponse) buildFeatures(features []valueobjects.PlanFeature) []dto
 		}
 	}
 	return result
-}
-
-func (h *PlansResponse) getPlanPrices(planID int, planPrices map[int][]dto.Price) []dto.Price {
-	prices := planPrices[planID]
-	if prices == nil {
-		return []dto.Price{
-			{Cents: 0, Currency: "RUB"},
-			{Cents: 0, Currency: "USD"},
-			{Cents: 0, Currency: "EUR"},
-		}
-	}
-	return prices
 }

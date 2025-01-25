@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/golang-jwt/jwt/v4"
 	"goproxy/application"
+	"goproxy/domain/aggregates"
 	"goproxy/domain/lavatopsubdomain/lavatopaggregates"
 	"goproxy/domain/lavatopsubdomain/lavatopvalueobjects"
 	"goproxy/infrastructure/api/api-http/google_auth"
