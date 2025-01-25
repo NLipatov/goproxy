@@ -8,6 +8,7 @@ require (
 	github.com/confluentinc/confluent-kafka-go v1.9.2
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang-jwt/jwt/v4 v4.5.1
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/lib/pq v1.10.9
 	github.com/shirou/gopsutil v3.21.11+incompatible
@@ -16,6 +17,7 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	golang.org/x/crypto v0.32.0
 	golang.org/x/oauth2 v0.25.0
+	golang.org/x/sync v0.10.0
 )
 
 require (
@@ -40,7 +42,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/lufia/plan9stats v0.0.0-20240909124753-873cd0166683 // indirect
 	github.com/magiconair/properties v1.8.9 // indirect
@@ -72,7 +73,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.31.0 // indirect
 	go.opentelemetry.io/otel/trace v1.33.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241209162323-e6fa225c2576 // indirect
