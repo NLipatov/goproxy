@@ -274,6 +274,11 @@ func startPlanHttpRestApi() {
 		log.Fatal(portErr)
 	}
 
+	usersApiHost := os.Getenv("USERS_API_HOST")
+	if usersApiHost == "" {
+		log.Fatalf("'USERS_API_HOST' env var must be set")
+	}
+
 	db, err := dal.ConnectDB()
 	defer func(db *sql.DB) {
 		_ = db.Close()
@@ -301,6 +306,13 @@ func startPlanHttpRestApi() {
 	planRepository := repositories.NewPlansRepository(db, planRepoCache)
 	planOfferRepository := repositories.NewPlanLavatopOfferRepository(db, cache)
 	lavaTopUseCases := application.NewLavaTopUseCases(billingService, lavaTopUseCasesCache)
-	controller := accounting.NewAccountingController(billingService, planRepository, planOfferRepository, lavaTopUseCases)
+	userRepoCache, userRepoCacheErr := repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
+	if userRepoCacheErr != nil {
+		log.Fatal(err)
+	}
+	userRepo := repositories.NewUserRepository(db, userRepoCache)
+	cryptoService := services.GetCryptoService()
+	userUseCases := application.NewUserUseCases(userRepo, cryptoService)
+	controller := accounting.NewAccountingController(billingService, planRepository, planOfferRepository, lavaTopUseCases, userUseCases)
 	controller.Listen(port)
 }
