@@ -174,6 +174,24 @@ func (h Handler) GetPlans(w http.ResponseWriter, _ *http.Request) {
 			}
 		}
 
+		prices := planPrices[plan.Id()]
+		if prices == nil {
+			prices = []dto.Price{
+				{
+					Cents:    0,
+					Currency: "RUB",
+				},
+				{
+					Cents:    0,
+					Currency: "USD",
+				},
+				{
+					Cents:    0,
+					Currency: "EUR",
+				},
+			}
+		}
+
 		planResponses[i] = dto.Plan{
 			Name: plan.Name(),
 			Limits: dto.Limits{
@@ -193,7 +211,7 @@ func (h Handler) GetPlans(w http.ResponseWriter, _ *http.Request) {
 			},
 			Features:     features,
 			DurationDays: plan.DurationDays(),
-			Prices:       planPrices[plan.Id()],
+			Prices:       prices,
 		}
 	}
 
