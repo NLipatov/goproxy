@@ -2,7 +2,7 @@ package crypto_cloud
 
 import (
 	"goproxy/application"
-	crypto_cloud_commands2 "goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
+	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/infrastructure/payments/crypto_cloud/crypto_cloud_configuration"
 	"goproxy/infrastructure/payments/crypto_cloud/crypto_cloud_dto"
 	"goproxy/infrastructure/payments/crypto_cloud/crypto_cloud_handlers"
@@ -23,7 +23,7 @@ func NewCryptoCloudService(messageBus application.MessageBusService) *CryptoClou
 	}
 }
 
-func (s *CryptoCloudService) IssueInvoice(command crypto_cloud_commands2.IssueInvoiceCommand) (interface{}, error) {
+func (s *CryptoCloudService) IssueInvoice(command crypto_cloud_commands.IssueInvoiceCommand) (interface{}, error) {
 	request := crypto_cloud_dto.InvoiceRequest{
 		Amount:  command.AmountUSD,
 		ShopID:  s.config.ShopId(),
@@ -36,6 +36,7 @@ func (s *CryptoCloudService) IssueInvoice(command crypto_cloud_commands2.IssueIn
 	return crypto_cloud_handlers.HandleCreateInvoice(s.httpClient, url, s.config.ApiKey(), request)
 }
 
-func (s *CryptoCloudService) HandlePostBack(command crypto_cloud_commands2.PostBackCommand) (interface{}, error) {
+func (s *CryptoCloudService) HandlePostBack(command crypto_cloud_commands.PostBackCommand) error {
+	command.Secret = s.config.SecretKey()
 	return crypto_cloud_handlers.HandlePostBack(command, s.messageBus)
 }
