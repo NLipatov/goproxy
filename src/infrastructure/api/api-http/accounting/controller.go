@@ -20,8 +20,8 @@ type Controller struct {
 func NewAccountingController(
 	billingService application.BillingService[lavatopaggregates.Invoice,
 		lavatopvalueobjects.Offer], planRepository application.PlanRepository,
-	planOfferRepository application.PlanOfferRepository, lavaTopUseCases application.LavaTopUseCases) *Controller {
-	handler := lavatop.NewHandler(billingService, planRepository, planOfferRepository, lavaTopUseCases)
+	planOfferRepository application.PlanOfferRepository, lavaTopUseCases application.LavaTopUseCases, userUseCases application.UserUseCases) *Controller {
+	handler := lavatop.NewHandler(billingService, planRepository, planOfferRepository, lavaTopUseCases, userUseCases)
 	return &Controller{
 		handler:     handler,
 		corsManager: CORS.NewCORSManager(),
@@ -39,7 +39,7 @@ func (c *Controller) Listen(port int) {
 		case http.MethodGet:
 			c.handler.GetInvoices(w, r)
 		case http.MethodPost:
-			c.handler.PostInvoices(w, r)
+			c.handler.PostInvoice(w, r)
 		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}

@@ -12,12 +12,14 @@ import (
 	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure"
 	"goproxy/infrastructure/api/api-http/accounting"
+	"goproxy/infrastructure/api/api-http/crypto_cloud_billing"
 	"goproxy/infrastructure/api/api-http/google_auth"
 	"goproxy/infrastructure/api/api-http/users"
 	"goproxy/infrastructure/api/api-ws"
 	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/eventhandlers/UserConsumedTrafficEvent"
 	"goproxy/infrastructure/eventhandlers/UserPasswordChangedEvent"
+	"goproxy/infrastructure/payments/crypto_cloud"
 	"goproxy/infrastructure/services"
 	"log"
 	"os"
@@ -42,6 +44,9 @@ func main() {
 		startPlanHttpRestApi()
 	case "google-auth":
 		startGoogleAuthController()
+	case "crypto-cloud-billing":
+		startCryptoCloudBillingService()
+
 	default:
 		log.Fatalf("Unsupported mode: %s", mode)
 	}
@@ -274,6 +279,11 @@ func startPlanHttpRestApi() {
 		log.Fatal(portErr)
 	}
 
+	usersApiHost := os.Getenv("USERS_API_HOST")
+	if usersApiHost == "" {
+		log.Fatalf("'USERS_API_HOST' env var must be set")
+	}
+
 	db, err := dal.ConnectDB()
 	defer func(db *sql.DB) {
 		_ = db.Close()
@@ -301,6 +311,39 @@ func startPlanHttpRestApi() {
 	planRepository := repositories.NewPlansRepository(db, planRepoCache)
 	planOfferRepository := repositories.NewPlanLavatopOfferRepository(db, cache)
 	lavaTopUseCases := application.NewLavaTopUseCases(billingService, lavaTopUseCasesCache)
-	controller := accounting.NewAccountingController(billingService, planRepository, planOfferRepository, lavaTopUseCases)
+	userRepoCache, userRepoCacheErr := repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
+	if userRepoCacheErr != nil {
+		log.Fatal(err)
+	}
+	userRepo := repositories.NewUserRepository(db, userRepoCache)
+	cryptoService := services.GetCryptoService()
+	userUseCases := application.NewUserUseCases(userRepo, cryptoService)
+	controller := accounting.NewAccountingController(billingService, planRepository, planOfferRepository, lavaTopUseCases, userUseCases)
 	controller.Listen(port)
+}
+
+func startCryptoCloudBillingService() {
+	strPort := os.Getenv("HTTP_PORT")
+	if strPort == "" {
+		log.Fatalf("'HTTP_PORT' env var must be set")
+	}
+	port, portErr := strconv.Atoi(strPort)
+
+	if portErr != nil {
+		log.Fatal(portErr)
+	}
+	kafkaConf, kafkaConfErr := config.NewKafkaConfig(domain.BILLING)
+	if kafkaConfErr != nil {
+		log.Fatal(kafkaConfErr)
+	}
+	kafkaConf.GroupID = "crypto-cloud-billing"
+
+	messageBusService, err := services.NewKafkaService(kafkaConf)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cryptoCloudService := crypto_cloud.NewCryptoCloudService(messageBusService)
+	restController := crypto_cloud_billing.NewController(cryptoCloudService)
+	restController.Listen(port)
 }

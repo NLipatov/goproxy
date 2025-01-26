@@ -2,14 +2,18 @@ package lavatop
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/golang-jwt/jwt/v4"
 	"goproxy/application"
+	"goproxy/domain/aggregates"
 	"goproxy/domain/lavatopsubdomain/lavatopaggregates"
 	"goproxy/domain/lavatopsubdomain/lavatopvalueobjects"
 	"goproxy/infrastructure/api/api-http/google_auth"
 	"goproxy/infrastructure/dto"
+	"io"
 	"log"
 	"net/http"
+	"os"
 )
 
 type Handler struct {
@@ -18,16 +22,22 @@ type Handler struct {
 	plansRepository     application.PlanRepository
 	planOfferRepository application.PlanOfferRepository
 	lavaTopUseCases     application.LavaTopUseCases
+	plansResponse       PlansResponse
 }
 
 func NewHandler(billingService application.BillingService[lavatopaggregates.Invoice, lavatopvalueobjects.Offer],
 	planRepository application.PlanRepository, planOfferRepository application.PlanOfferRepository,
-	lavaTopUseCases application.LavaTopUseCases) *Handler {
+	lavaTopUseCases application.LavaTopUseCases, userUseCases application.UserUseCases) *Handler {
+
+	plansResponse := NewPlansResponse(planRepository, lavaTopUseCases, planOfferRepository)
+
 	return &Handler{
 		billingService:      billingService,
 		plansRepository:     planRepository,
 		planOfferRepository: planOfferRepository,
 		lavaTopUseCases:     lavaTopUseCases,
+		plansResponse:       plansResponse,
+		userUseCases:        userUseCases,
 	}
 }
 
@@ -109,97 +119,131 @@ func (h Handler) GetInvoices(w http.ResponseWriter, r *http.Request) {
 	panic("not implemented")
 }
 
-func (h Handler) PostInvoices(writer http.ResponseWriter, request *http.Request) {
-	panic("not implemented")
-}
-
-func (h Handler) GetPlans(w http.ResponseWriter, _ *http.Request) {
-	response := dto.ApiResponse[[]dto.Plan]{
-		Payload:      nil,
-		ErrorCode:    0,
-		ErrorMessage: "",
+func (h Handler) PostInvoice(w http.ResponseWriter, r *http.Request) {
+	user, userErr := h.getUser(r)
+	if userErr != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(dto.ApiResponse[dto.PostInvoiceResponse]{
+			Payload:      nil,
+			ErrorCode:    http.StatusUnauthorized,
+			ErrorMessage: "not authorized",
+		})
+		return
 	}
 
-	plans, plansErr := h.plansRepository.GetAllWithFeatures()
-	if plansErr != nil {
-		response.ErrorCode = http.StatusInternalServerError
-		response.ErrorMessage = "could not load plans"
-		w.WriteHeader(http.StatusInternalServerError)
+	var cmd dto.AccountingIssueInvoiceCommand
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 512))
+	if err := decoder.Decode(&cmd); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(dto.ApiResponse[dto.PostInvoiceResponse]{
+			Payload:      nil,
+			ErrorCode:    http.StatusBadRequest,
+			ErrorMessage: "invalid body",
+		})
+		return
+	}
+
+	currency, currencyErr := lavatopvalueobjects.ParseCurrency(cmd.Currency)
+	if currencyErr != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(dto.ApiResponse[dto.PostInvoiceResponse]{
+			Payload:      nil,
+			ErrorCode:    http.StatusBadRequest,
+			ErrorMessage: "invalid currency",
+		})
+		return
+	}
+
+	paymentMethod, paymentMethodErr := lavatopvalueobjects.ParsePaymentMethod(cmd.PaymentMethod)
+	if paymentMethodErr != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(dto.ApiResponse[dto.PostInvoiceResponse]{
+			Payload:      nil,
+			ErrorCode:    http.StatusBadRequest,
+			ErrorMessage: "invalid payment method",
+		})
+		return
+	}
+
+	newIssueInvoiceResponse := NewIssueInvoiceResponse(h.lavaTopUseCases, user, currency, paymentMethod, cmd.OfferId)
+
+	response, responseErr := newIssueInvoiceResponse.Build()
+	if responseErr != nil {
 		_ = json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	planFeatures := make(map[int][]string)
-	for _, plan := range plans {
-		features := make([]string, len(plan.Features()))
-		for fi, feature := range plan.Features() {
-			features[fi] = feature.Feature()
-		}
-		planFeatures[plan.Id()] = features
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(response)
+}
+
+func (h Handler) GetPlans(w http.ResponseWriter, _ *http.Request) {
+	response, responseErr := h.plansResponse.Build()
+	if responseErr != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(dto.ApiResponse[[]dto.Plan]{
+			Payload:      nil,
+			ErrorCode:    http.StatusInternalServerError,
+			ErrorMessage: "could not load plans",
+		})
+		return
 	}
-
-	planPrices := make(map[int][]dto.Price)
-	lavatopOffers, lavatopOffersErr := h.lavaTopUseCases.GetOffers()
-	if lavatopOffersErr == nil {
-
-		for _, plan := range plans {
-			planOfferIds, offersErr := h.planOfferRepository.GetOffers(plan.Id())
-			if offersErr != nil {
-				continue
-			}
-
-			for _, offer := range lavatopOffers {
-				for _, planOffers := range planOfferIds {
-					if offer.ExtId() == planOffers.OfferId() {
-						for _, v := range offer.Prices() {
-							priceDto := dto.Price{
-								Currency: v.Currency().String(),
-								Cents:    v.Cents(),
-							}
-							planPrices[plan.Id()] = append(planPrices[plan.Id()], priceDto)
-						}
-					}
-				}
-			}
-		}
-	}
-
-	planResponses := make([]dto.Plan, len(plans))
-	for i, plan := range plans {
-		features := make([]dto.Feature, len(plan.Features()))
-		for fi, feature := range plan.Features() {
-			features[fi] = dto.Feature{
-				Feature:            feature.Feature(),
-				FeatureDescription: feature.Description(),
-			}
-		}
-
-		planResponses[i] = dto.Plan{
-			Name: plan.Name(),
-			Limits: dto.Limits{
-				Bandwidth: dto.BandwidthLimit{
-					IsLimited: plan.LimitBytes() != 0,
-					Used:      0,
-					Total:     plan.LimitBytes(),
-				},
-				Connections: dto.ConnectionLimit{
-					IsLimited:                true,
-					MaxConcurrentConnections: 25,
-				},
-				Speed: dto.SpeedLimit{
-					IsLimited:         false,
-					MaxBytesPerSecond: 125_000_000, // 125_000_000 bytes is 1 Gigabit/s
-				},
-			},
-			Features:     features,
-			DurationDays: plan.DurationDays(),
-			Prices:       planPrices[plan.Id()],
-		}
-	}
-
-	response.Payload = &planResponses
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(response)
+}
+
+func (h Handler) getUser(r *http.Request) (aggregates.User, error) {
+	idToken, err := google_auth.GetIdTokenFromCookie(r)
+	if err != nil {
+		return aggregates.User{}, err
+	}
+
+	verifiedToken, err := google_auth.VerifyIDToken(idToken)
+	if err != nil {
+		return aggregates.User{}, fmt.Errorf("failed to verify token: %w", err)
+	}
+
+	claims, ok := verifiedToken.Claims.(jwt.MapClaims)
+	if !ok {
+		return aggregates.User{}, fmt.Errorf("failed to parse token claims")
+	}
+
+	email := claims["email"].(string)
+	if email == "" {
+		return aggregates.User{}, fmt.Errorf("email claim empty")
+	}
+
+	usersApiHost := os.Getenv("USERS_API_HOST")
+	if usersApiHost == "" {
+		return aggregates.User{}, fmt.Errorf("users api host empty")
+	}
+
+	resp, err := http.Get(fmt.Sprintf("%s/users/get?email=%s", usersApiHost, email))
+	if err != nil {
+		return aggregates.User{}, fmt.Errorf("failed to fetch user id: %v", err)
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	body, bodyErr := io.ReadAll(resp.Body)
+	if bodyErr != nil {
+		return aggregates.User{}, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	var userResult dto.GetUserResult
+	deserializationErr := json.Unmarshal(body, &userResult)
+	if deserializationErr != nil {
+		return aggregates.User{}, fmt.Errorf("failed to deserialize user result: %v", deserializationErr)
+	}
+
+	user, userErr := aggregates.NewUser(userResult.Id, userResult.Username, email, email)
+	if userErr != nil {
+		return aggregates.User{}, fmt.Errorf("failed to load user: %v", userErr)
+	}
+
+	return user, nil
 }
