@@ -10,6 +10,7 @@ type Configuration struct {
 	createInvoiceUrl string
 	apiKey           string
 	shopId           string
+	secretKey        string
 }
 
 func NewConfiguration() Configuration {
@@ -23,11 +24,17 @@ func NewConfiguration() Configuration {
 		log.Fatalf("SHOP_ID environment variable not set")
 	}
 
+	SecretKey := os.Getenv("SECRET_KEY")
+	if SecretKey == "" {
+		log.Fatalf("SECRET_KEY environment variable not set")
+	}
+
 	return Configuration{
 		baseUrl:          "https://api.cryptocloud.plus",
 		createInvoiceUrl: "/v2/invoice/create",
 		apiKey:           ApiKey,
 		shopId:           ShopId,
+		secretKey:        SecretKey,
 	}
 }
 
@@ -45,4 +52,8 @@ func (c Configuration) ApiKey() string {
 
 func (c Configuration) ShopId() string {
 	return c.shopId
+}
+
+func (c Configuration) SecretKey() string {
+	return c.secretKey
 }
