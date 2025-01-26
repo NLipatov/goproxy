@@ -19,6 +19,7 @@ func NewCryptoCloudService() *CryptoCloudService {
 		httpClient: &http.Client{},
 	}
 }
+
 func (s *CryptoCloudService) IssueInvoice(command crypto_cloud_commands.IssueInvoiceCommand) (interface{}, error) {
 	request := crypto_cloud_dto.InvoiceRequest{
 		Amount: command.AmountUSD,
