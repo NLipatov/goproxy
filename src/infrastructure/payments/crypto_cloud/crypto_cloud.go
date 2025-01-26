@@ -1,10 +1,10 @@
-package payments
+package crypto_cloud
 
 import (
 	"goproxy/application/payments/crypto_cloud_commands"
-	"goproxy/infrastructure/payments/crypto_cloud_configuration"
-	"goproxy/infrastructure/payments/crypto_cloud_dto"
-	"goproxy/infrastructure/payments/crypto_cloud_handlers"
+	"goproxy/infrastructure/payments/crypto_cloud/crypto_cloud_configuration"
+	"goproxy/infrastructure/payments/crypto_cloud/crypto_cloud_dto"
+	"goproxy/infrastructure/payments/crypto_cloud/crypto_cloud_handlers"
 	"net/http"
 )
 

@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"goproxy/infrastructure/payments/crypto_cloud_dto"
+	crypto_cloud_dto2 "goproxy/infrastructure/payments/crypto_cloud/crypto_cloud_dto"
 	"io"
 	"net/http"
 )
 
-func HandleCreateInvoice(httpClient *http.Client, url string, apiKey string, requestData crypto_cloud_dto.InvoiceRequest) (interface{}, error) {
+func HandleCreateInvoice(httpClient *http.Client, url string, apiKey string, requestData crypto_cloud_dto2.InvoiceRequest) (interface{}, error) {
 	requestBody, err := json.Marshal(requestData)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func HandleCreateInvoice(httpClient *http.Client, url string, apiKey string, req
 		return nil, errors.New("unexpected HTTP status: " + resp.Status)
 	}
 
-	var response crypto_cloud_dto.InvoiceResponse
+	var response crypto_cloud_dto2.InvoiceResponse
 	if unmarshalErr := json.Unmarshal(body, &response); unmarshalErr != nil {
 		return nil, unmarshalErr
 	}
