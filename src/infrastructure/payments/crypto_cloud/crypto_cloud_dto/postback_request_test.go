@@ -19,7 +19,7 @@ func Test_PostBackRequest_Deserialization(t *testing.T) {
 	assert.Equal(t, "H5LY5T6R", postbackRequest.InvoiceID, "InvoiceID should match")
 	assert.Equal(t, 100.0, postbackRequest.AmountCrypto, "AmountCrypto should match")
 	assert.Equal(t, "USDT_TRC20", postbackRequest.Currency, "Currency should match")
-	assert.Equal(t, "order_id", postbackRequest.OrderID, "OrderID should match")
+	assert.Equal(t, "order_id", postbackRequest.OrderID, "Order Id should match")
 	assert.Equal(t, "eyJ0eXAiOiJKV1QiLCJhbGciOiJIAcI1NiJ9.eyJpZCI6MTMsImV4cCI6MTYzMTc4NjQyNn0.HQavV3z8dFnk56bX3MSY5X9lR6qVa9YhAoeTEHkaAzs", postbackRequest.Token, "Token should match")
 
 	// asserts all InvoiceInfo fields
