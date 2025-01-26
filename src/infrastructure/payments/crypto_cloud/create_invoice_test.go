@@ -3,6 +3,7 @@ package crypto_cloud
 import (
 	"github.com/stretchr/testify/assert"
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
+	"goproxy/dal/repositories/mocks"
 	"os"
 	"testing"
 )
@@ -19,7 +20,8 @@ func TestCreateInvoiceIntegration(t *testing.T) {
 		return
 	}
 
-	service := NewCryptoCloudService()
+	mockMessageBus := mocks.NewMockMessageBusService()
+	service := NewCryptoCloudService(mockMessageBus)
 
 	invoiceRequest := crypto_cloud_commands.IssueInvoiceCommand{
 		AmountUSD: 100.0,
