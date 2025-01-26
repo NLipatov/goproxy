@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goproxy/application"
-	"goproxy/application/payments/crypto_cloud_commands"
+	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/domain"
 	"goproxy/domain/events"
 )

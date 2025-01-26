@@ -2,7 +2,7 @@ package crypto_cloud
 
 import (
 	"github.com/stretchr/testify/assert"
-	"goproxy/application/payments/crypto_cloud_commands"
+	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"os"
 	"testing"
 )
