@@ -38,17 +38,17 @@ services:
       timeout: 5s
       retries: 5
   
-  lt-billing-postgres:
+  billing-postgres:
     image: postgres:17.2-bookworm
     container_name: lavatop-billing-postgres
     environment:
-      POSTGRES_USER: ${LT_BILLING_DB_USER}
-      POSTGRES_PASSWORD: ${LT_BILLING_DB_PASS}
-      POSTGRES_DB: ${LT_BILLING_DB_DATABASE}
+      POSTGRES_USER: ${BILLING_DB_USER}
+      POSTGRES_PASSWORD: ${BILLING_DB_PASS}
+      POSTGRES_DB: ${BILLING_DB_DATABASE}
     ports:
       - "5435:5432"
     volumes:
-      - lt-billing-postgres_data:/var/lib/postgresql/data
+      - billing-postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
       interval: 10s
@@ -85,19 +85,19 @@ services:
       plan-postgres:
         condition: service_healthy
 
-  lt-billing-ctx-migrator:
+  billing-ctx-migrator:
     build:
       context: ./src
-    container_name: lt-billing-ctx-migrator
+    container_name: billing-ctx-migrator
     environment:
       - MODE=migrator
-      - DB_DATABASE=${LT_BILLING_DB_DATABASE}
-      - DB_USER=${LT_BILLING_DB_USER}
-      - DB_PASS=${LT_BILLING_DB_PASS}
-      - DB_HOST=${LT_BILLING_DB_HOST}
-      - DB_PORT=${LT_BILLING_DB_PORT}
+      - DB_DATABASE=${BILLING_DB_DATABASE}
+      - DB_USER=${BILLING_DB_USER}
+      - DB_PASS=${BILLING_DB_PASS}
+      - DB_HOST=${BILLING_DB_HOST}
+      - DB_PORT=${BILLING_DB_PORT}
     depends_on:
-      lt-billing-postgres:
+      billing-postgres:
         condition: service_healthy
   
   google-auth-api:
@@ -263,6 +263,99 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+    
+  billing-cache:
+      image: valkey/valkey:8.0-bookworm
+      container_name: billing-cache
+      ports:
+        - "6380:6379"
+      volumes:
+        - billing-cache_data:/data
+      healthcheck:
+        test: ["CMD", "redis-cli", "ping"]
+        interval: 30s
+        timeout: 5s
+        retries: 3
+        start_period: 5s
+        
+  billing-api:
+    build:
+      context: ./src
+    container_name: billing-api
+    ports:
+      - "4040:4040"
+    environment:
+      - MODE=billing-api
+      - HTTP_PORT=4040
+      - ALLOWED_ORIGINS=*
+      - DB_DATABASE=${BILLING_DB_DATABASE}
+      - DB_HOST=${BILLING_DB_HOST}
+      - DB_PASS=${BILLING_DB_PASS}
+      - DB_PORT=${BILLING_DB_PORT}
+      - DB_USER=${BILLING_DB_USER}
+      - TC_CACHE_HOST=${BILLING_CACHE_HOST}
+      - TC_CACHE_PORT=${BILLING_CACHE_PORT}
+      - TC_CACHE_USER=${BILLING_CACHE_USER}
+    depends_on:
+      init-kafka-topics:
+        condition: service_completed_successfully
+      billing-postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      billing-cache:
+        condition: service_healthy
+        
+  plans-api:
+    build:
+      context: ./src
+    container_name: plans-api
+    ports:
+      - "9090:9090"
+    environment:
+      - MODE=plans-api
+      - HTTP_PORT=9090
+      - ALLOWED_ORIGINS=*
+      - DB_DATABASE=${PLANS_DB_DATABASE}
+      - DB_HOST=${PLANS_DB_HOST}
+      - DB_PASS=${PLANS_DB_PASS}
+      - DB_PORT=${PLANS_DB_PORT}
+      - DB_USER=${PLANS_DB_USER}
+      - TC_CACHE_HOST=${TC_CACHE_HOST}
+      - TC_CACHE_PORT=${TC_CACHE_PORT}
+      - TC_CACHE_USER=${TC_CACHE_USER}
+    depends_on:
+      init-kafka-topics:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      plan-controller-cache:
+        condition: service_healthy
+        
+  crypto-cloud-billing-api:
+    build:
+      context: ./src
+    container_name: crypto-cloud-billing-api
+    ports:
+      - "2020:2020"
+    environment:
+      - MODE=crypto-cloud-billing-api
+      - HTTP_PORT=2020
+      - ALLOWED_ORIGINS=${CC_BILLING_ALLOWED_ORIGINS}
+      - BILLING_KAFKA_AUTO_OFFSET_RESET=${CC_BILLING_KAFKA_AUTO_OFFSET_RESET}
+      - BILLING_KAFKA_BOOTSTRAP_SERVERS=${CC_BILLING_KAFKA_BOOTSTRAP_SERVERS}
+      - BILLING_KAFKA_GROUP_ID=${CC_BILLING_KAFKA_GROUP_ID}
+      - BILLING_KAFKA_TOPIC=${CC_BILLING_KAFKA_TOPIC}
+      - API_KEY=${CC_BILLING_API_KEY}
+      - SECRET_KEY=${CC_BILLING_SECRET_KEY}
+      - SHOP_ID=${CC_BILLING_SHOP_ID}
+    depends_on:
+      init-kafka-topics:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      plan-controller-cache:
+        condition: service_healthy
 
   plan-controller:
     build:
@@ -305,5 +398,6 @@ services:
 volumes:
   postgres_data:
   plan-postgres_data: 
-  lt-billing-postgres_data:
+  billing-postgres_data:
   plan-controller-cache_data:
+  billing-cache_data:
