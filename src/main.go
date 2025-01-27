@@ -11,6 +11,7 @@ import (
 	"goproxy/domain/aggregates"
 	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure"
+	"goproxy/infrastructure/api/api-http/billing"
 	"goproxy/infrastructure/api/api-http/crypto_cloud_billing"
 	"goproxy/infrastructure/api/api-http/google_auth"
 	"goproxy/infrastructure/api/api-http/plans"
@@ -42,10 +43,12 @@ func main() {
 		startPlanController()
 	case "google-auth":
 		startGoogleAuthController()
-	case "crypto-cloud-billing":
-		startCryptoCloudBillingService()
 	case "plans-api":
 		startPlansApi()
+	case "billing-api":
+		startBillingApi()
+	case "crypto-cloud-billing-api":
+		startCryptoCloudBillingService()
 
 	default:
 		log.Fatalf("Unsupported mode: %s", mode)
@@ -320,4 +323,31 @@ func startPlansApi() {
 	planRepository := repositories.NewPlansRepository(db, planRepoCache)
 	plansController := plans.NewPlansController(planRepository)
 	plansController.Listen(port)
+}
+
+func startBillingApi() {
+	strPort := os.Getenv("HTTP_PORT")
+	if strPort == "" {
+		log.Fatalf("'HTTP_PORT' env var must be set")
+	}
+	port, portErr := strconv.Atoi(strPort)
+
+	if portErr != nil {
+		log.Fatal(portErr)
+	}
+	db, err := dal.ConnectDB()
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	planPriceRepoCache, planPriceRepoCacheErr := services.NewRedisCache[[]cache_serialization.PriceDto]()
+	if planPriceRepoCacheErr != nil {
+		log.Fatalf("failed to instantiate cache service: %s", planPriceRepoCacheErr)
+	}
+	planPriceRepository := repositories.NewPlanPriceRepository(db, planPriceRepoCache)
+	controller := billing.NewBillingController(planPriceRepository)
+	controller.Listen(port)
 }
