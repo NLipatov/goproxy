@@ -35,6 +35,11 @@ type PlanRepository interface {
 	GetByIdWithFeatures(id int) (aggregates.Plan, error)
 }
 
+type PlanPriceRepository interface {
+	Repository[dataobjects.PlanPrice]
+	GetAllWithPlanId(planId int) ([]dataobjects.PlanPrice, error)
+}
+
 type UserPlanRepository interface {
 	Repository[aggregates.UserPlan]
 	GetUserActivePlan(userId int) (aggregates.UserPlan, error)
