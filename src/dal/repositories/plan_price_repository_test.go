@@ -49,7 +49,7 @@ func TestPlanPriceRepository(t *testing.T) {
 	})
 
 	t.Run("GetById_CacheSetCalled", func(t *testing.T) {
-		priceId := insertTestPlanPrice(t, db, 5, "RUB", 200_000)
+		priceId := insertTestPlanPrice(t, db, 2, "RUB", 200_000)
 
 		_, _ = planPriceRepository.GetById(priceId)
 		cached, cachedErr := planPriceCache.Get(fmt.Sprintf("GetById_%d", priceId))
@@ -61,7 +61,7 @@ func TestPlanPriceRepository(t *testing.T) {
 
 	t.Run("GetById_CacheGetCalled", func(t *testing.T) {
 		expectedId := 100
-		expectedPlanId := 200
+		expectedPlanId := 3
 		expectedCents := int64(3000)
 		expectedCurrency := "DKK"
 		setErr := planPriceCache.Set(fmt.Sprintf("GetById_%d", expectedId), []cache_serialization.PriceDto{
@@ -88,7 +88,7 @@ func TestPlanPriceRepository(t *testing.T) {
 	})
 
 	t.Run("Create", func(t *testing.T) {
-		expectedPlanId := 2
+		expectedPlanId := 4
 		expectedCents := int64(10_000)
 		expectedCurrency := "EUR"
 
@@ -110,7 +110,7 @@ func TestPlanPriceRepository(t *testing.T) {
 	})
 
 	t.Run("Update", func(t *testing.T) {
-		planId := 2
+		planId := 5
 		cents := int64(10_000)
 		currency := "EUR"
 
@@ -120,7 +120,7 @@ func TestPlanPriceRepository(t *testing.T) {
 			t.Fatal(priceErr)
 		}
 
-		newPlanId := 3
+		newPlanId := 6
 		newCents := int64(80_000)
 		newCurrency := "AUD"
 		updatedPricePlan := dataobjects.NewPlanPrice(priceId, newPlanId, newCents, newCurrency)
@@ -141,7 +141,7 @@ func TestPlanPriceRepository(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
-		priceId := insertTestPlanPrice(t, db, 3, "PLN", 150_000)
+		priceId := insertTestPlanPrice(t, db, 7, "PLN", 150_000)
 		price, priceErr := planPriceRepository.GetById(priceId)
 		if priceErr != nil {
 			t.Fatal(priceErr)
@@ -159,7 +159,7 @@ func TestPlanPriceRepository(t *testing.T) {
 	})
 
 	t.Run("GetAllWithPlanId", func(t *testing.T) {
-		planId := 4
+		planId := 8
 
 		fPlanId := insertTestPlanPrice(t, db, planId, "EUR", 150_000)
 		fPlan := dataobjects.NewPlanPrice(fPlanId, planId, 150_000, "EUR")
