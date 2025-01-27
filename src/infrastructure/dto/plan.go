@@ -1,5 +1,11 @@
 package dto
 
+type PlanDto struct {
+	Name         string   `json:"name"`
+	Features     []string `json:"features"`
+	DurationDays int      `json:"duration_days"`
+}
+
 type Plan struct {
 	Name         string    `json:"name"`
 	Limits       Limits    `json:"limits"`
