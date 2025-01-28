@@ -109,7 +109,7 @@ services:
     environment:
       - MODE=google-auth
       - SERVE_PORT=3030
-      - ALLOWED_ORIGINS=http://localhost:5173
+      - ALLOWED_ORIGINS=${UI_BASE_URL}
       - DB_DATABASE=${DB_DATABASE}
       - DB_USER=${DB_USER}
       - DB_PASS=${DB_PASS}
@@ -287,7 +287,7 @@ services:
     environment:
       - MODE=billing-api
       - HTTP_PORT=4040
-      - ALLOWED_ORIGINS=*
+      - ALLOWED_ORIGINS=${UI_BASE_URL}
       - DB_DATABASE=${BILLING_DB_DATABASE}
       - DB_HOST=${BILLING_DB_HOST}
       - DB_PASS=${BILLING_DB_PASS}
@@ -315,7 +315,7 @@ services:
     environment:
       - MODE=plans-api
       - HTTP_PORT=9090
-      - ALLOWED_ORIGINS=*
+      - ALLOWED_ORIGINS=${UI_BASE_URL}
       - DB_DATABASE=${PLANS_DB_DATABASE}
       - DB_HOST=${PLANS_DB_HOST}
       - DB_PASS=${PLANS_DB_PASS}
@@ -384,7 +384,7 @@ services:
       - TC_CACHE_PORT=${TC_CACHE_PORT}
       - TC_CACHE_USER=${TC_CACHE_USER}
       - TC_CACHE_PASSWORD=${TC_CACHE_PASSWORD}
-      - ALLOWED_ORIGINS=http://localhost:5173
+      - ALLOWED_ORIGINS=${UI_BASE_URL}
     depends_on:
       init-kafka-topics:
         condition: service_completed_successfully
