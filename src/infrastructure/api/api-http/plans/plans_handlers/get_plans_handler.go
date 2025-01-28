@@ -52,6 +52,7 @@ func (h *GetPlansHandler) MapPlanToPlanDto(plan aggregates.Plan) dto.PlanDto {
 	}
 
 	return dto.PlanDto{
+		Id:           plan.Id(),
 		Name:         plan.Name(),
 		Features:     features,
 		DurationDays: plan.DurationDays(),
