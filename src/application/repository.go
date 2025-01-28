@@ -4,6 +4,7 @@ import (
 	"goproxy/domain/aggregates"
 	"goproxy/domain/dataobjects"
 	"goproxy/domain/events"
+	"goproxy/domain/valueobjects"
 )
 
 type Repository[T any] interface {
@@ -50,4 +51,9 @@ type PlanOfferRepository interface {
 	Create(plo dataobjects.PlanLavatopOffer) (int, error)
 	Update(plo dataobjects.PlanLavatopOffer) error
 	Delete(plo dataobjects.PlanLavatopOffer) error
+}
+
+type OrderRepository interface {
+	Repository[dataobjects.Order]
+	GetByPlanIdAndEmail(planId int, email valueobjects.Email) ([]dataobjects.Order, error)
 }

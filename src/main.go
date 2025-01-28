@@ -305,9 +305,10 @@ func startCryptoCloudBillingService() {
 		log.Fatalf("failed to instantiate cache service: %s", planPriceRepoCacheErr)
 	}
 	planPriceRepository := repositories.NewPlanPriceRepository(db, planPriceRepoCache)
+	orderRepository := repositories.NewOrderRepository(db)
 
 	cryptoCloudService := crypto_cloud.NewCryptoCloudService(messageBusService)
-	restController := crypto_cloud_billing.NewController(cryptoCloudService, planPriceRepository)
+	restController := crypto_cloud_billing.NewController(cryptoCloudService, planPriceRepository, orderRepository)
 	restController.Listen(port)
 }
 

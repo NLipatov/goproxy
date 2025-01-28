@@ -1,6 +1,7 @@
 package crypto_cloud
 
 import (
+	"fmt"
 	"goproxy/application"
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/infrastructure/payments/crypto_cloud/crypto_cloud_configuration"
@@ -34,7 +35,7 @@ func (s *CryptoCloudService) IssueInvoice(command crypto_cloud_commands.IssueInv
 		Currency: currencyCode,
 		ShopID:   s.config.ShopId(),
 		Email:    command.Email,
-		OrderID:  command.OrderId,
+		OrderID:  fmt.Sprintf("N_%d", command.OrderId),
 	}
 
 	url := s.config.BaseUrl() + s.config.CreateInvoiceUrl()

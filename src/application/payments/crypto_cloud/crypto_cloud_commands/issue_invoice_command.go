@@ -6,5 +6,5 @@ type IssueInvoiceCommand struct {
 	Currency crypto_cloud_currencies.CryptoCloudCurrency
 	Amount   float64
 	Email    string
-	OrderId  string
+	OrderId  int
 }

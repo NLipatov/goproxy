@@ -15,10 +15,11 @@ type Controller struct {
 	handler     Handler
 }
 
-func NewController(cryptoCloudService crypto_cloud.PaymentProvider, planPriceRepository application.PlanPriceRepository) *Controller {
+func NewController(cryptoCloudService crypto_cloud.PaymentProvider,
+	planPriceRepository application.PlanPriceRepository, orderRepository application.OrderRepository) *Controller {
 	return &Controller{
 		corsManager: CORS.NewCORSManager(),
-		handler:     NewHandler(cryptoCloudService, planPriceRepository),
+		handler:     NewHandler(cryptoCloudService, planPriceRepository, orderRepository),
 	}
 }
 
