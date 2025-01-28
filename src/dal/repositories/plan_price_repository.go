@@ -120,6 +120,9 @@ func (p *PlanPriceRepository) Delete(entity dataobjects.PlanPrice) error {
 		return fmt.Errorf("could not delete plan price: %s", rowsAffectedErr)
 	}
 
+	_ = p.cache.Delete(fmt.Sprintf("GetById_%d", entity.Id()))
+	_ = p.cache.Delete(fmt.Sprintf("GetAllWithPlanId_%d", entity.PlanId()))
+
 	return nil
 }
 
