@@ -292,9 +292,22 @@ func startCryptoCloudBillingService() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	db, err := dal.ConnectDB()
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	planPriceRepoCache, planPriceRepoCacheErr := services.NewRedisCache[[]cache_serialization.PriceDto]()
+	if planPriceRepoCacheErr != nil {
+		log.Fatalf("failed to instantiate cache service: %s", planPriceRepoCacheErr)
+	}
+	planPriceRepository := repositories.NewPlanPriceRepository(db, planPriceRepoCache)
 
 	cryptoCloudService := crypto_cloud.NewCryptoCloudService(messageBusService)
-	restController := crypto_cloud_billing.NewController(cryptoCloudService)
+	restController := crypto_cloud_billing.NewController(cryptoCloudService, planPriceRepository)
 	restController.Listen(port)
 }
 

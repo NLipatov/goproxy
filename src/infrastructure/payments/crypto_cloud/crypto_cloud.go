@@ -24,11 +24,17 @@ func NewCryptoCloudService(messageBus application.MessageBusService) *CryptoClou
 }
 
 func (s *CryptoCloudService) IssueInvoice(command crypto_cloud_commands.IssueInvoiceCommand) (interface{}, error) {
+	currencyCode, currencyCodeErr := command.Currency.String()
+	if currencyCodeErr != nil {
+		return nil, currencyCodeErr
+	}
+
 	request := crypto_cloud_dto.InvoiceRequest{
-		Amount:  command.AmountUSD,
-		ShopID:  s.config.ShopId(),
-		Email:   command.Email,
-		OrderID: command.OrderId,
+		Amount:   command.Amount,
+		Currency: currencyCode,
+		ShopID:   s.config.ShopId(),
+		Email:    command.Email,
+		OrderID:  command.OrderId,
 	}
 
 	url := s.config.BaseUrl() + s.config.CreateInvoiceUrl()

@@ -2,6 +2,7 @@ package crypto_cloud_billing
 
 import (
 	"fmt"
+	"goproxy/application"
 	"goproxy/application/payments/crypto_cloud"
 	"goproxy/infrastructure/api/CORS"
 	"log"
@@ -14,10 +15,10 @@ type Controller struct {
 	handler     Handler
 }
 
-func NewController(cryptoCloudService crypto_cloud.PaymentProvider) *Controller {
+func NewController(cryptoCloudService crypto_cloud.PaymentProvider, planPriceRepository application.PlanPriceRepository) *Controller {
 	return &Controller{
 		corsManager: CORS.NewCORSManager(),
-		handler:     NewHandler(cryptoCloudService),
+		handler:     NewHandler(cryptoCloudService, planPriceRepository),
 	}
 }
 
