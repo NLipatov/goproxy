@@ -23,13 +23,13 @@ func (ih *CreateInvoiceHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var dto dto.IssueInvoiceCommandDto
+	var requestDto dto.IssueInvoiceCommandDto
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 512))
-	if err := decoder.Decode(&dto); err != nil {
+	if err := decoder.Decode(&requestDto); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("invalid request body"))
 		return
 	}
 
-	ih.billingService.IssueInvoice(w, dto)
+	ih.billingService.IssueInvoice(w, requestDto)
 }
