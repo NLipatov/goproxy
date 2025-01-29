@@ -7,20 +7,27 @@ import (
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/domain"
 	"goproxy/domain/events"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_configuration"
 )
 
 type PostBackHandler struct {
-	jwt application.Jwt
+	config     crypto_cloud_configuration.Configuration
+	jwt        application.Jwt
+	messageBus application.MessageBusService
 }
 
-func NewPostBackHandler(jwt application.Jwt) PostBackHandler {
+func NewPostBackHandler(jwt application.Jwt,
+	config crypto_cloud_configuration.Configuration,
+	messageBus application.MessageBusService) PostBackHandler {
 	return PostBackHandler{
-		jwt: jwt,
+		jwt:        jwt,
+		config:     config,
+		messageBus: messageBus,
 	}
 }
 
-func (p *PostBackHandler) HandlePostBack(command crypto_cloud_commands.PostBackCommand, messageBus application.MessageBusService) error {
-	isTokenValid, isTokenValidErr := p.jwt.Validate(command.Secret, command.Token)
+func (p *PostBackHandler) HandlePostBack(command crypto_cloud_commands.PostBackCommand) error {
+	isTokenValid, isTokenValidErr := p.jwt.Validate(p.config.SecretKey(), command.Token)
 	if isTokenValidErr != nil {
 		return fmt.Errorf("could not validate token: %s", isTokenValidErr)
 	}
@@ -40,7 +47,7 @@ func (p *PostBackHandler) HandlePostBack(command crypto_cloud_commands.PostBackC
 		return eventErr
 	}
 
-	produceErr := messageBus.Produce(fmt.Sprintf("%s", domain.BILLING), event)
+	produceErr := p.messageBus.Produce(fmt.Sprintf("%s", domain.BILLING), event)
 	if produceErr != nil {
 		return produceErr
 	}

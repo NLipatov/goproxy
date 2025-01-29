@@ -20,11 +20,12 @@ type CryptoCloudService struct {
 }
 
 func NewCryptoCloudService(messageBus application.MessageBusService) *CryptoCloudService {
+	config := crypto_cloud_configuration.NewConfiguration()
 	return &CryptoCloudService{
-		config:               crypto_cloud_configuration.NewConfiguration(),
+		config:               config,
 		httpClient:           &http.Client{},
 		messageBus:           messageBus,
-		postBackHandler:      crypto_cloud_handlers.NewPostBackHandler(services.NewHS256Jwt()),
+		postBackHandler:      crypto_cloud_handlers.NewPostBackHandler(services.NewHS256Jwt(), config, messageBus),
 		createInvoiceHandler: crypto_cloud_handlers.NewCreateInvoiceHandler(),
 	}
 }
@@ -49,6 +50,5 @@ func (s *CryptoCloudService) IssueInvoice(command crypto_cloud_commands.IssueInv
 }
 
 func (s *CryptoCloudService) HandlePostBack(command crypto_cloud_commands.PostBackCommand) error {
-	command.Secret = s.config.SecretKey()
-	return s.postBackHandler.HandlePostBack(command, s.messageBus)
+	return s.postBackHandler.HandlePostBack(command)
 }
