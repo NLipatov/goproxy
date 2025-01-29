@@ -1,7 +1,7 @@
 package crypto_cloud_commands
 
 import (
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api_interaction/crypto_cloud_currencies"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_currencies"
 )
 
 type IssueInvoiceCommand struct {

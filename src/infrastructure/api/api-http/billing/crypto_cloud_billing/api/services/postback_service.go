@@ -5,7 +5,7 @@ import (
 	"goproxy/application"
 	"goproxy/application/payments/crypto_cloud"
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api_interaction/crypto_cloud_api_dto"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_api_dto"
 	"log"
 	"net/http"
 	"strconv"

@@ -1,12 +1,12 @@
-package internal_api
+package api
 
 import (
 	"fmt"
 	"goproxy/application"
 	"goproxy/application/payments/crypto_cloud"
 	"goproxy/infrastructure/api/CORS"
-	handlers2 "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/internal_api/handlers"
-	services2 "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/internal_api/services"
+	handlers2 "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/api/handlers"
+	services2 "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/api/services"
 	"log"
 	"net/http"
 )

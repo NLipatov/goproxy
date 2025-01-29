@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/internal_api/dto"
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/internal_api/services"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/api/dto"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/api/services"
 	"net/http"
 )
 
