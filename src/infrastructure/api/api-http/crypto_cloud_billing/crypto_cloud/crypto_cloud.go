@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"goproxy/application"
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
-	"goproxy/infrastructure/payments/crypto_cloud/crypto_cloud_configuration"
-	"goproxy/infrastructure/payments/crypto_cloud/crypto_cloud_dto"
-	"goproxy/infrastructure/payments/crypto_cloud/crypto_cloud_handlers"
+	"goproxy/infrastructure/api/api-http/crypto_cloud_billing/crypto_cloud/crypto_cloud_configuration"
+	"goproxy/infrastructure/api/api-http/crypto_cloud_billing/crypto_cloud/crypto_cloud_dto"
+	crypto_cloud_handlers2 "goproxy/infrastructure/api/api-http/crypto_cloud_billing/crypto_cloud/crypto_cloud_handlers"
 	"net/http"
 )
 
@@ -40,10 +40,10 @@ func (s *CryptoCloudService) IssueInvoice(command crypto_cloud_commands.IssueInv
 
 	url := s.config.BaseUrl() + s.config.CreateInvoiceUrl()
 
-	return crypto_cloud_handlers.HandleCreateInvoice(s.httpClient, url, s.config.ApiKey(), request)
+	return crypto_cloud_handlers2.HandleCreateInvoice(s.httpClient, url, s.config.ApiKey(), request)
 }
 
 func (s *CryptoCloudService) HandlePostBack(command crypto_cloud_commands.PostBackCommand) error {
 	command.Secret = s.config.SecretKey()
-	return crypto_cloud_handlers.HandlePostBack(command, s.messageBus)
+	return crypto_cloud_handlers2.HandlePostBack(command, s.messageBus)
 }
