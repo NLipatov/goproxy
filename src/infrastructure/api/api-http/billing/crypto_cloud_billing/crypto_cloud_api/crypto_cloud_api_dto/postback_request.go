@@ -1,4 +1,4 @@
-package crypto_cloud_dto
+package crypto_cloud_api_dto
 
 // PostbackRequest comes from CryptoCloud when, for example, invoice was paid
 type PostbackRequest struct {

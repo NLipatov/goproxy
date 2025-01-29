@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
-	"goproxy/infrastructure/api/api-http/crypto_cloud_billing/crypto_cloud_billing_dto"
-	"goproxy/infrastructure/api/api-http/crypto_cloud_billing/services"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/dto"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/services"
 	"net/http"
 )
 
@@ -23,7 +23,7 @@ func (ih *CreateInvoiceHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var dto crypto_cloud_billing_dto.IssueInvoiceCommandDto
+	var dto dto.IssueInvoiceCommandDto
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 512))
 	if err := decoder.Decode(&dto); err != nil {
 		w.WriteHeader(http.StatusBadRequest)

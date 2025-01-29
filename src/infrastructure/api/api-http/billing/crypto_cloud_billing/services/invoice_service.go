@@ -8,8 +8,8 @@ import (
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/domain/dataobjects"
 	"goproxy/domain/valueobjects"
-	"goproxy/infrastructure/api/api-http/crypto_cloud_billing/crypto_cloud/crypto_cloud_currencies"
-	"goproxy/infrastructure/api/api-http/crypto_cloud_billing/crypto_cloud_billing_dto"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_currencies"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/dto"
 	"net/http"
 )
 
@@ -29,7 +29,7 @@ func NewBillingService(orderRepository application.OrderRepository,
 	}
 }
 
-func (h *BillingService) IssueInvoice(w http.ResponseWriter, dto crypto_cloud_billing_dto.IssueInvoiceCommandDto) {
+func (h *BillingService) IssueInvoice(w http.ResponseWriter, dto dto.IssueInvoiceCommandDto) {
 	currency, amount, planPriceErr := h.getPlanPrice(dto.PlanId, dto.Currency)
 	if planPriceErr != nil {
 		w.WriteHeader(http.StatusInternalServerError)

@@ -3,17 +3,18 @@ package services
 import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v4"
+	"goproxy/application"
 	"time"
 )
 
-type Jwt struct {
+type HS256Jwt struct {
 }
 
-func NewJwt() *Jwt {
-	return &Jwt{}
+func NewHS256Jwt() application.Jwt {
+	return HS256Jwt{}
 }
 
-func (j *Jwt) Generate(secret string, ttl time.Duration, claims map[string]string) (string, error) {
+func (j HS256Jwt) Generate(secret string, ttl time.Duration, claims map[string]string) (string, error) {
 	tokenClaims := jwt.MapClaims{
 		"exp": time.Now().Add(ttl).Unix(),
 	}
@@ -32,7 +33,13 @@ func (j *Jwt) Generate(secret string, ttl time.Duration, claims map[string]strin
 	return tokenString, nil
 }
 
-func (j *Jwt) Validate(secret string, jwtToken string) (bool, error) {
+func (j HS256Jwt) Validate(secret string, jwtToken string) (bool, error) {
+	if len(secret) > 2 && secret[:2] == "ey" {
+		return false, fmt.Errorf(
+			"expected secret key but received JWT token. Did you mix up token and secret",
+		)
+	}
+
 	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return false, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])

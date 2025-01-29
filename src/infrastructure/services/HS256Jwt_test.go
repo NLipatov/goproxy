@@ -6,7 +6,7 @@ import (
 )
 
 func TestJWTService_GenerateAndValidate(t *testing.T) {
-	jwtService := NewJwt()
+	jwtService := NewHS256Jwt()
 	secret := "my_test_secret"
 	ttl := 8 * time.Hour
 	claims := map[string]string{
@@ -31,7 +31,7 @@ func TestJWTService_GenerateAndValidate(t *testing.T) {
 }
 
 func TestJWTService_ValidateExpiredToken(t *testing.T) {
-	jwtService := NewJwt()
+	jwtService := NewHS256Jwt()
 	secret := "my_test_secret"
 
 	ttl := time.Nanosecond //expires immediately
@@ -53,7 +53,7 @@ func TestJWTService_ValidateExpiredToken(t *testing.T) {
 }
 
 func TestJWTService_ValidateWithWrongSecret(t *testing.T) {
-	jwtService := NewJwt()
+	jwtService := NewHS256Jwt()
 	correctSecret := "correct_secret"
 	wrongSecret := "wrong_secret"
 

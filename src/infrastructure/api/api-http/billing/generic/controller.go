@@ -1,10 +1,10 @@
-package billing
+package generic
 
 import (
 	"fmt"
 	"goproxy/application"
 	"goproxy/infrastructure/api/CORS"
-	"goproxy/infrastructure/api/api-http/billing/handlers"
+	"goproxy/infrastructure/api/api-http/billing/generic/handlers"
 	"log"
 	"net/http"
 )

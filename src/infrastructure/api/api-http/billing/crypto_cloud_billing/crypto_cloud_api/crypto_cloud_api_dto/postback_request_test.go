@@ -1,4 +1,4 @@
-package crypto_cloud_dto
+package crypto_cloud_api_dto
 
 import (
 	"encoding/json"

@@ -11,9 +11,9 @@ import (
 	"goproxy/domain/aggregates"
 	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure"
-	"goproxy/infrastructure/api/api-http/billing"
-	"goproxy/infrastructure/api/api-http/crypto_cloud_billing"
-	"goproxy/infrastructure/api/api-http/crypto_cloud_billing/crypto_cloud"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing"
+	services2 "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api"
+	"goproxy/infrastructure/api/api-http/billing/generic"
 	"goproxy/infrastructure/api/api-http/google_auth"
 	"goproxy/infrastructure/api/api-http/plans"
 	"goproxy/infrastructure/api/api-http/users"
@@ -307,7 +307,7 @@ func startCryptoCloudBillingService() {
 	planPriceRepository := repositories.NewPlanPriceRepository(db, planPriceRepoCache)
 	orderRepository := repositories.NewOrderRepository(db)
 
-	cryptoCloudService := crypto_cloud.NewCryptoCloudService(messageBusService)
+	cryptoCloudService := services2.NewCryptoCloudService(messageBusService)
 	restController := crypto_cloud_billing.NewController(cryptoCloudService, planPriceRepository, orderRepository)
 	restController.Listen(port)
 }
@@ -362,6 +362,6 @@ func startBillingApi() {
 		log.Fatalf("failed to instantiate cache service: %s", planPriceRepoCacheErr)
 	}
 	planPriceRepository := repositories.NewPlanPriceRepository(db, planPriceRepoCache)
-	controller := billing.NewBillingController(planPriceRepository)
+	controller := generic.NewBillingController(planPriceRepository)
 	controller.Listen(port)
 }

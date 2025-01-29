@@ -1,4 +1,4 @@
-package crypto_cloud_dto
+package crypto_cloud_api_dto
 
 type InvoiceRequest struct {
 	ShopID    string            `json:"shop_id"`

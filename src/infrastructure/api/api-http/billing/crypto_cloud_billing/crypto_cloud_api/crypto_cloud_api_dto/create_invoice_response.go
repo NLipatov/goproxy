@@ -1,4 +1,4 @@
-package crypto_cloud_dto
+package crypto_cloud_api_dto
 
 type InvoiceResponse struct {
 	Status string `json:"status"`

@@ -1,4 +1,4 @@
-package crypto_cloud_billing_dto
+package dto
 
 type IssueInvoiceCommandDto struct {
 	PlanId   int    `json:"plan_id"`
