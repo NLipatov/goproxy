@@ -10,6 +10,7 @@ import (
 	"goproxy/domain/valueobjects"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_currencies"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/dto"
+	"log"
 	"net/http"
 )
 
@@ -17,15 +18,18 @@ type BillingService struct {
 	orderRepository     application.OrderRepository
 	planPriceRepository application.PlanPriceRepository
 	paymentService      crypto_cloud.PaymentProvider
+	messageBusService   CryptoCloudMessageBusService
 }
 
 func NewBillingService(orderRepository application.OrderRepository,
 	planPriceRepository application.PlanPriceRepository,
-	paymentService crypto_cloud.PaymentProvider) BillingService {
+	paymentService crypto_cloud.PaymentProvider,
+	messageBusService CryptoCloudMessageBusService) BillingService {
 	return BillingService{
 		orderRepository:     orderRepository,
 		planPriceRepository: planPriceRepository,
 		paymentService:      paymentService,
+		messageBusService:   messageBusService,
 	}
 }
 
@@ -118,6 +122,11 @@ func (h *BillingService) handleFreePlan(w http.ResponseWriter, planId int, email
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("could not create order"))
 		return
+	}
+
+	produceEventErr := h.messageBusService.ProducePlanAssignedEvent(planId, emailVO.String())
+	if produceEventErr != nil {
+		log.Printf("could not produce plan assigned event: %v", produceEventErr)
 	}
 
 	w.WriteHeader(http.StatusCreated)

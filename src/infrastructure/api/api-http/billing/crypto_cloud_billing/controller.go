@@ -19,9 +19,11 @@ type Controller struct {
 }
 
 func NewController(cryptoCloudService crypto_cloud.PaymentProvider,
-	planPriceRepository application.PlanPriceRepository, orderRepository application.OrderRepository) *Controller {
-	billingService := services.NewBillingService(orderRepository, planPriceRepository, cryptoCloudService)
-	postbackService := services.NewPostbackService(orderRepository, planPriceRepository, cryptoCloudService)
+	planPriceRepository application.PlanPriceRepository, orderRepository application.OrderRepository,
+	messageBus application.MessageBusService) *Controller {
+	cryptoCloudMessageBusService := services.NewCryptoCloudMessageBusService(messageBus)
+	billingService := services.NewBillingService(orderRepository, planPriceRepository, cryptoCloudService, cryptoCloudMessageBusService)
+	postbackService := services.NewPostbackService(orderRepository, planPriceRepository, cryptoCloudService, cryptoCloudMessageBusService)
 	return &Controller{
 		corsManager:          CORS.NewCORSManager(),
 		createInvoiceHandler: handlers.NewCreateInvoiceHandler(billingService),

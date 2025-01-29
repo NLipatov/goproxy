@@ -12,13 +12,14 @@ import (
 	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing"
-	services2 "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api"
+	cryptocloud "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api"
 	"goproxy/infrastructure/api/api-http/billing/generic"
 	"goproxy/infrastructure/api/api-http/google_auth"
 	"goproxy/infrastructure/api/api-http/plans"
 	"goproxy/infrastructure/api/api-http/users"
 	"goproxy/infrastructure/api/api-ws"
 	"goproxy/infrastructure/config"
+	"goproxy/infrastructure/eventhandlers/PlanAssignedEvent"
 	"goproxy/infrastructure/eventhandlers/UserConsumedTrafficEvent"
 	"goproxy/infrastructure/eventhandlers/UserPasswordChangedEvent"
 	"goproxy/infrastructure/services"
@@ -121,7 +122,8 @@ func startPlanController() {
 	planRepo := repositories.NewPlansRepository(db, planRepoCache)
 	userPlanRepo := repositories.NewUserPlanRepository(db)
 
-	userConsumedTrafficEventProcessorErr := UserConsumedTrafficEvent.NewUserConsumedTrafficEventProcessor(trafficCache, userPlanRepo, planRepo, domain.PLAN).
+	userConsumedTrafficEventProcessorErr := UserConsumedTrafficEvent.
+		NewUserConsumedTrafficEventProcessor(trafficCache, userPlanRepo, planRepo, domain.PLAN).
 		ProcessEvents()
 
 	if userConsumedTrafficEventProcessorErr != nil {
@@ -140,6 +142,15 @@ func startPlanController() {
 
 	userRepo := repositories.NewUserRepository(db, bigCache)
 	userPlanInfoUseCases := application.NewUserPlanInfoUseCases(planRepo, userPlanRepo, userRepo, planCache, trafficCache)
+
+	planAssignedEventProcessorErr := PlanAssignedEvent.
+		NewPlanAssignedProcessor(domain.PLAN, planCache, userPlanRepo, userRepo, planRepo, trafficCache, usersRestApiHost).
+		ProcessEvents()
+
+	if planAssignedEventProcessorErr != nil {
+		log.Fatal(planAssignedEventProcessorErr)
+	}
+
 	planController := api_ws.NewPlanController(userPlanInfoUseCases, usersRestApiHost)
 	planController.Listen(3031)
 
@@ -307,8 +318,8 @@ func startCryptoCloudBillingService() {
 	planPriceRepository := repositories.NewPlanPriceRepository(db, planPriceRepoCache)
 	orderRepository := repositories.NewOrderRepository(db)
 
-	cryptoCloudService := services2.NewCryptoCloudService(messageBusService)
-	restController := crypto_cloud_billing.NewController(cryptoCloudService, planPriceRepository, orderRepository)
+	cryptoCloudService := cryptocloud.NewCryptoCloudService(messageBusService)
+	restController := crypto_cloud_billing.NewController(cryptoCloudService, planPriceRepository, orderRepository, messageBusService)
 	restController.Listen(port)
 }
 
