@@ -1,12 +1,12 @@
-package crypto_cloud_billing
+package internal_api
 
 import (
 	"fmt"
 	"goproxy/application"
 	"goproxy/application/payments/crypto_cloud"
 	"goproxy/infrastructure/api/CORS"
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/handlers"
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/services"
+	handlers2 "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/internal_api/handlers"
+	services2 "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/internal_api/services"
 	"log"
 	"net/http"
 )
@@ -14,20 +14,20 @@ import (
 type Controller struct {
 	port                 int
 	corsManager          CORS.CORSManager
-	createInvoiceHandler handlers.CreateInvoiceHandler
-	postBackHandler      handlers.PostbackHandler
+	createInvoiceHandler handlers2.CreateInvoiceHandler
+	postBackHandler      handlers2.PostbackHandler
 }
 
 func NewController(cryptoCloudService crypto_cloud.PaymentProvider,
 	planPriceRepository application.PlanPriceRepository, orderRepository application.OrderRepository,
 	messageBus application.MessageBusService) *Controller {
-	cryptoCloudMessageBusService := services.NewCryptoCloudMessageBusService(messageBus)
-	billingService := services.NewBillingService(orderRepository, planPriceRepository, cryptoCloudService, cryptoCloudMessageBusService)
-	postbackService := services.NewPostbackService(orderRepository, planPriceRepository, cryptoCloudService, cryptoCloudMessageBusService)
+	cryptoCloudMessageBusService := services2.NewCryptoCloudMessageBusService(messageBus)
+	billingService := services2.NewBillingService(orderRepository, planPriceRepository, cryptoCloudService, cryptoCloudMessageBusService)
+	postbackService := services2.NewPostbackService(orderRepository, planPriceRepository, cryptoCloudService, cryptoCloudMessageBusService)
 	return &Controller{
 		corsManager:          CORS.NewCORSManager(),
-		createInvoiceHandler: handlers.NewCreateInvoiceHandler(billingService),
-		postBackHandler:      handlers.NewPostbackHandler(postbackService),
+		createInvoiceHandler: handlers2.NewCreateInvoiceHandler(billingService),
+		postBackHandler:      handlers2.NewPostbackHandler(postbackService),
 	}
 }
 

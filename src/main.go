@@ -11,8 +11,8 @@ import (
 	"goproxy/domain/aggregates"
 	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure"
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing"
-	cryptocloud "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api"
+	cryptocloud "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api_interaction"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/internal_api"
 	"goproxy/infrastructure/api/api-http/billing/generic"
 	"goproxy/infrastructure/api/api-http/google_auth"
 	"goproxy/infrastructure/api/api-http/plans"
@@ -319,7 +319,7 @@ func startCryptoCloudBillingService() {
 	orderRepository := repositories.NewOrderRepository(db)
 
 	cryptoCloudService := cryptocloud.NewCryptoCloudService(messageBusService)
-	restController := crypto_cloud_billing.NewController(cryptoCloudService, planPriceRepository, orderRepository, messageBusService)
+	restController := internal_api.NewController(cryptoCloudService, planPriceRepository, orderRepository, messageBusService)
 	restController.Listen(port)
 }
 

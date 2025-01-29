@@ -7,7 +7,7 @@ import (
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/domain"
 	"goproxy/domain/events"
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_configuration"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api_interaction/crypto_cloud_configuration"
 	"goproxy/infrastructure/services"
 )
 

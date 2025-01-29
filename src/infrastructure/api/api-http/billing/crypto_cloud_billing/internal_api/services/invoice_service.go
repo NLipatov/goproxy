@@ -8,8 +8,8 @@ import (
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/domain/dataobjects"
 	"goproxy/domain/valueobjects"
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_currencies"
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/dto"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api_interaction/crypto_cloud_currencies"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/internal_api/dto"
 	"log"
 	"net/http"
 )

@@ -1,9 +1,9 @@
-package crypto_cloud_api
+package crypto_cloud_api_interaction
 
 import (
 	"goproxy/application"
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_handlers"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api_interaction/crypto_cloud_handlers"
 )
 
 type CryptoCloudService struct {
