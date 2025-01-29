@@ -9,7 +9,14 @@ import (
 	"net/http"
 )
 
-func HandleCreateInvoice(httpClient *http.Client, url string, apiKey string, requestData crypto_cloud_api_dto.InvoiceRequest) (interface{}, error) {
+type CreateInvoiceHandler struct {
+}
+
+func NewCreateInvoiceHandler() CreateInvoiceHandler {
+	return CreateInvoiceHandler{}
+}
+
+func (c *CreateInvoiceHandler) HandleCreateInvoice(httpClient *http.Client, url string, apiKey string, requestData crypto_cloud_api_dto.InvoiceRequest) (interface{}, error) {
 	requestBody, err := json.Marshal(requestData)
 	if err != nil {
 		return nil, err

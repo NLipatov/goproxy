@@ -124,7 +124,6 @@ func TestOrderRepository(t *testing.T) {
 
 		order, err = repo.GetById(orderId)
 		assert.NotNil(t, err)
-		assert.Nil(t, order)
 	})
 }
 

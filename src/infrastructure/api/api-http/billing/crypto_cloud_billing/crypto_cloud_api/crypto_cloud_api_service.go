@@ -12,18 +12,20 @@ import (
 )
 
 type CryptoCloudService struct {
-	postBackHandler crypto_cloud_handlers.PostBackHandler
-	config          crypto_cloud_configuration.Configuration
-	httpClient      *http.Client
-	messageBus      application.MessageBusService
+	createInvoiceHandler crypto_cloud_handlers.CreateInvoiceHandler
+	postBackHandler      crypto_cloud_handlers.PostBackHandler
+	config               crypto_cloud_configuration.Configuration
+	httpClient           *http.Client
+	messageBus           application.MessageBusService
 }
 
 func NewCryptoCloudService(messageBus application.MessageBusService) *CryptoCloudService {
 	return &CryptoCloudService{
-		config:          crypto_cloud_configuration.NewConfiguration(),
-		httpClient:      &http.Client{},
-		messageBus:      messageBus,
-		postBackHandler: crypto_cloud_handlers.NewPostBackHandler(services.NewHS256Jwt()),
+		config:               crypto_cloud_configuration.NewConfiguration(),
+		httpClient:           &http.Client{},
+		messageBus:           messageBus,
+		postBackHandler:      crypto_cloud_handlers.NewPostBackHandler(services.NewHS256Jwt()),
+		createInvoiceHandler: crypto_cloud_handlers.NewCreateInvoiceHandler(),
 	}
 }
 
@@ -43,7 +45,7 @@ func (s *CryptoCloudService) IssueInvoice(command crypto_cloud_commands.IssueInv
 
 	url := s.config.BaseUrl() + s.config.CreateInvoiceUrl()
 
-	return crypto_cloud_handlers.HandleCreateInvoice(s.httpClient, url, s.config.ApiKey(), request)
+	return s.createInvoiceHandler.HandleCreateInvoice(s.httpClient, url, s.config.ApiKey(), request)
 }
 
 func (s *CryptoCloudService) HandlePostBack(command crypto_cloud_commands.PostBackCommand) error {
