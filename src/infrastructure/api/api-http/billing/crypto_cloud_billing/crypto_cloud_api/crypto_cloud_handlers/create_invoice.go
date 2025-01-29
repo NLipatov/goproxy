@@ -4,20 +4,43 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_api_dto"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_configuration"
 	"io"
 	"net/http"
 )
 
 type CreateInvoiceHandler struct {
+	config     crypto_cloud_configuration.Configuration
+	httpClient *http.Client
 }
 
 func NewCreateInvoiceHandler() CreateInvoiceHandler {
-	return CreateInvoiceHandler{}
+	return CreateInvoiceHandler{
+		config:     crypto_cloud_configuration.NewConfiguration(),
+		httpClient: &http.Client{},
+	}
 }
 
-func (c *CreateInvoiceHandler) HandleCreateInvoice(httpClient *http.Client, url string, apiKey string, requestData crypto_cloud_api_dto.InvoiceRequest) (interface{}, error) {
-	requestBody, err := json.Marshal(requestData)
+func (c *CreateInvoiceHandler) HandleCreateInvoice(command crypto_cloud_commands.IssueInvoiceCommand) (interface{}, error) {
+	currencyCode, currencyCodeErr := command.Currency.String()
+	if currencyCodeErr != nil {
+		return nil, currencyCodeErr
+	}
+
+	request := crypto_cloud_api_dto.InvoiceRequest{
+		Amount:   command.Amount,
+		Currency: currencyCode,
+		ShopID:   c.config.ShopId(),
+		Email:    command.Email,
+		OrderID:  fmt.Sprintf("N_%d", command.OrderId),
+	}
+
+	url := c.config.BaseUrl() + c.config.CreateInvoiceUrl()
+
+	requestBody, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
 	}
@@ -27,10 +50,10 @@ func (c *CreateInvoiceHandler) HandleCreateInvoice(httpClient *http.Client, url 
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Token "+apiKey)
+	req.Header.Set("Authorization", "Token "+c.config.ApiKey())
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

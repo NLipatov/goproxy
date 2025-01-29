@@ -8,6 +8,7 @@ import (
 	"goproxy/domain"
 	"goproxy/domain/events"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_configuration"
+	"goproxy/infrastructure/services"
 )
 
 type PostBackHandler struct {
@@ -16,12 +17,10 @@ type PostBackHandler struct {
 	messageBus application.MessageBusService
 }
 
-func NewPostBackHandler(jwt application.Jwt,
-	config crypto_cloud_configuration.Configuration,
-	messageBus application.MessageBusService) PostBackHandler {
+func NewPostBackHandler(messageBus application.MessageBusService) PostBackHandler {
 	return PostBackHandler{
-		jwt:        jwt,
-		config:     config,
+		jwt:        services.NewHS256Jwt(),
+		config:     crypto_cloud_configuration.NewConfiguration(),
 		messageBus: messageBus,
 	}
 }
