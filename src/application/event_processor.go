@@ -80,7 +80,9 @@ func (e *EventProcessor) ProcessNextEvent() error {
 
 	eventHandler, ok := e.handlerMap[event.EventType.Value()]
 	if !ok {
-		return fmt.Errorf("no handler found for event type: %s", event.EventType.Value())
+		// If there's no handlers in this processor - skip event.
+		// Other processor probably will handle this event.
+		return nil
 	}
 
 	return eventHandler.Handle(event.Payload)
