@@ -12,7 +12,7 @@ import (
 
 type BigCacheUserRepositoryCache struct {
 	cache      *bigcache.BigCache
-	serializer cache_serialization.CacheSerializer[aggregates.User, cache_serialization.StoredUser]
+	serializer cache_serialization.CacheSerializer[aggregates.User, cache_serialization.UserDto]
 }
 
 func NewBigCacheUserRepositoryCache(ttl time.Duration, cleanInterval time.Duration, shards int, maxEntrySizeBytes int) (BigCacheUserRepositoryCache, error) {
@@ -49,7 +49,7 @@ func (b BigCacheUserRepositoryCache) Get(key string) (aggregates.User, error) {
 		return aggregates.User{}, err
 	}
 
-	var dto cache_serialization.StoredUser
+	var dto cache_serialization.UserDto
 	err = msgpack.Unmarshal(dtoBytes, &dto)
 	user := b.serializer.ToT(dto)
 	return user, err
