@@ -55,10 +55,10 @@ services:
       timeout: 5s
       retries: 5
 
-  auth-ctx-migrator:
+  proxy-ctx-migrator:
     build:
       context: ./src
-    container_name: auth-ctx-migrator
+    container_name: proxy-ctx-migrator
     environment:
       - MODE=migrator
       - DB_DATABASE=${DB_DATABASE}
@@ -159,7 +159,7 @@ services:
     depends_on:
       init-kafka-topics:
           condition: service_completed_successfully
-      auth-ctx-migrator:
+      proxy-ctx-migrator:
         condition: service_completed_successfully
 
   rest-api:
@@ -182,7 +182,7 @@ services:
       - PROXY_KAFKA_TOPIC=${USERS_REST_API_KAFKA_TOPIC} 
       - ALLOWED_ORIGINS=*
     depends_on:
-      - auth-ctx-migrator
+      - proxy-ctx-migrator
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.8.0
