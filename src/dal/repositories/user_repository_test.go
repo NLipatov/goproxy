@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
+	"goproxy/dal/cache"
 	"goproxy/domain/aggregates"
 	"os"
 	"testing"
@@ -28,12 +29,12 @@ func TestUserRepository(t *testing.T) {
 		_ = db.Close()
 	}(db)
 
-	cache, err := NewBigCacheUserRepositoryCache(15*time.Minute, 5*time.Minute, 16, 512)
+	cacheInstance, err := cache.NewBigCacheUserRepositoryCache(15*time.Minute, 5*time.Minute, 16, 512)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	repo := NewUserRepository(db, cache)
+	repo := NewUserRepository(db, cacheInstance)
 
 	t.Run("GetByUsername", func(t *testing.T) {
 		userId := insertTestUser(repo, t)

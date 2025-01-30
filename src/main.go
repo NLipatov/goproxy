@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"goproxy/application"
 	"goproxy/dal"
+	"goproxy/dal/cache"
 	"goproxy/dal/cache_serialization"
 	"goproxy/dal/repositories"
 	"goproxy/domain"
@@ -66,7 +67,7 @@ func startGoogleAuthController() {
 		log.Fatal(err)
 	}
 
-	cache, err := repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
+	userRepositoryCache, err := cache.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -82,13 +83,13 @@ func startGoogleAuthController() {
 		log.Fatal(err)
 	}
 
-	eventHandleErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
+	eventHandleErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, userRepositoryCache).
 		ProcessEvents()
 	if eventHandleErr != nil {
 		log.Fatal(eventHandleErr)
 	}
 
-	userRepo := repositories.NewUserRepository(db, cache)
+	userRepo := repositories.NewUserRepository(db, userRepositoryCache)
 	cryptoService := services.GetCryptoService()
 	userUseCases := application.NewUserUseCases(userRepo, cryptoService)
 	authService := google_auth.NewGoogleAuthService(userUseCases, cryptoService, messageBusService)
@@ -130,7 +131,7 @@ func startPlanController() {
 		log.Fatal(userConsumedTrafficEventProcessorErr)
 	}
 
-	bigCache, err := repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
+	bigCache, err := cache.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -199,7 +200,7 @@ func startHttpProxy() {
 		log.Fatal(err)
 	}
 
-	cache, err := createBigcacheInstance()
+	userRepositoryCache, err := createBigcacheInstance()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -210,13 +211,13 @@ func startHttpProxy() {
 	}
 	kafkaConfig.GroupID = "proxy"
 
-	eventHandleErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
+	eventHandleErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, userRepositoryCache).
 		ProcessEvents()
 	if eventHandleErr != nil {
 		log.Fatal(eventHandleErr)
 	}
 
-	userRepo := repositories.NewUserRepository(db, cache)
+	userRepo := repositories.NewUserRepository(db, userRepositoryCache)
 
 	userRestrictionService := services.NewUserRestrictionService()
 	cryptoService := services.GetCryptoService()
@@ -259,18 +260,18 @@ func startHttpRestApi() {
 		log.Fatal(err)
 	}
 
-	cache, err := createBigcacheInstance()
+	userRepositoryCache, err := createBigcacheInstance()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	eventHandleErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, cache).
+	eventHandleErr := UserPasswordChangedEvent.NewUserPasswordChangedEventProcessor[aggregates.User](domain.PROXY, userRepositoryCache).
 		ProcessEvents()
 	if eventHandleErr != nil {
 		log.Fatal(eventHandleErr)
 	}
 
-	userRepo := repositories.NewUserRepository(db, cache)
+	userRepo := repositories.NewUserRepository(db, userRepositoryCache)
 
 	cryptoService := services.GetCryptoService()
 	useCases := application.NewUserUseCases(userRepo, cryptoService)
@@ -279,8 +280,8 @@ func startHttpRestApi() {
 	usersController.Listen(port)
 }
 
-func createBigcacheInstance() (repositories.BigCacheUserRepositoryCache, error) {
-	return repositories.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
+func createBigcacheInstance() (cache.BigCacheUserRepositoryCache, error) {
+	return cache.NewBigCacheUserRepositoryCache(15*time.Minute, 1*time.Minute, 16, 512)
 }
 
 func startCryptoCloudBillingService() {
