@@ -4,9 +4,10 @@ networks:
     driver: bridge
 
 services:
-  postgres:
+  # DBs
+  proxy-postgres:
     image: postgres:17.2-bookworm
-    container_name: postgres
+    container_name: proxy-postgres
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASS}
@@ -14,7 +15,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - proxy-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
@@ -31,7 +32,7 @@ services:
     ports:
       - "5434:5432"
     volumes:
-      - plan-postgres_data:/var/lib/postgresql/data
+      - plan-proxy-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
       interval: 10s
@@ -48,13 +49,14 @@ services:
     ports:
       - "5435:5432"
     volumes:
-      - billing-postgres_data:/var/lib/postgresql/data
+      - billing-proxy-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
+  # DB migrators
   proxy-ctx-migrator:
     build:
       context: ./src
@@ -67,7 +69,7 @@ services:
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
     depends_on:
-      postgres:
+      proxy-postgres:
         condition: service_healthy
 
   plans-ctx-migrator:
@@ -100,6 +102,7 @@ services:
       billing-postgres:
         condition: service_healthy
   
+  # Services
   google-auth-api:
     build:
       context: ./src
@@ -128,7 +131,7 @@ services:
       - TC_CACHE_PORT=${TC_CACHE_PORT}
       - TC_CACHE_USER=${TC_CACHE_USER}
     depends_on:
-      postgres:
+      proxy-postgres:
         condition: service_healthy
       plan-controller-cache:
         condition: service_healthy
@@ -256,7 +259,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - plan-controller-cache_data:/data
+      - plan-controller-cache-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
@@ -270,7 +273,7 @@ services:
       ports:
         - "6380:6379"
       volumes:
-        - billing-cache_data:/data
+        - billing-cache-data:/data
       healthcheck:
         test: ["CMD", "redis-cli", "ping"]
         interval: 30s
@@ -405,8 +408,8 @@ services:
         condition: service_healthy
 
 volumes:
-  postgres_data:
-  plan-postgres_data: 
-  billing-postgres_data:
-  plan-controller-cache_data:
-  billing-cache_data:
+  proxy-postgres-data:
+  plan-proxy-postgres-data: 
+  billing-proxy-postgres-data:
+  plan-controller-cache-data:
+  billing-cache-data:
