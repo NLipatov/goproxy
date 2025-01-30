@@ -100,7 +100,7 @@ func (p *PlanPriceRepository) Update(entity dataobjects.PlanPrice) error {
 		return fmt.Errorf("could not update plan price: %s", resultErr)
 	}
 
-	rowsAffectedErr := checkRowsAffected(result)
+	rowsAffectedErr := NewSqlResult(result).checkRowsAffected()
 	if rowsAffectedErr != nil {
 		return fmt.Errorf("could not update plan price: %s", rowsAffectedErr)
 	}
@@ -115,7 +115,7 @@ func (p *PlanPriceRepository) Delete(entity dataobjects.PlanPrice) error {
 		return fmt.Errorf("could not delete plan price: %s", resultErr)
 	}
 
-	rowsAffectedErr := checkRowsAffected(result)
+	rowsAffectedErr := NewSqlResult(result).checkRowsAffected()
 	if rowsAffectedErr != nil {
 		return fmt.Errorf("could not delete plan price: %s", rowsAffectedErr)
 	}

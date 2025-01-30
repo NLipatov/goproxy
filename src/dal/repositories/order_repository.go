@@ -119,7 +119,7 @@ func (r *OrderRepository) Update(entity dataobjects.Order) error {
 		return fmt.Errorf("could not update order: %w", err)
 	}
 
-	return checkRowsAffected(result)
+	return NewSqlResult(result).checkRowsAffected()
 }
 
 func (r *OrderRepository) Delete(entity dataobjects.Order) error {
@@ -128,5 +128,5 @@ func (r *OrderRepository) Delete(entity dataobjects.Order) error {
 		return fmt.Errorf("could not delete order: %w", err)
 	}
 
-	return checkRowsAffected(result)
+	return NewSqlResult(result).checkRowsAffected()
 }
