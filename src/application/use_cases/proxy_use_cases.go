@@ -1,9 +1,10 @@
-package application
+package use_cases
 
 import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
+	"goproxy/application/contracts"
 	"goproxy/domain/valueobjects"
 	"log"
 	"net"
@@ -21,13 +22,13 @@ func (e UnauthorizedError) Error() string {
 }
 
 type ProxyUseCases struct {
-	httpProxyListener HttpProxyListenerService
-	proxyService      ProxyService
+	httpProxyListener contracts.HttpProxyListenerService
+	proxyService      contracts.ProxyService
 	authUseCases      AuthUseCases
 	readerPool        *sync.Pool
 }
 
-func NewProxyUseCases(proxy ProxyService, httpProxyListener HttpProxyListenerService, authUseCases AuthUseCases) *ProxyUseCases {
+func NewProxyUseCases(proxy contracts.ProxyService, httpProxyListener contracts.HttpProxyListenerService, authUseCases AuthUseCases) *ProxyUseCases {
 	return &ProxyUseCases{
 		proxyService:      proxy,
 		httpProxyListener: httpProxyListener,

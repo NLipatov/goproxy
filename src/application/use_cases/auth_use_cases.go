@@ -1,17 +1,18 @@
-package application
+package use_cases
 
 import (
 	"fmt"
+	"goproxy/application/contracts"
 	"goproxy/domain/valueobjects"
 )
 
 type AuthUseCases struct {
-	authService            AuthService
-	userRepository         UserRepository
-	userRestrictionService UserRestrictionService
+	authService            contracts.AuthService
+	userRepository         contracts.UserRepository
+	userRestrictionService contracts.UserRestrictionService
 }
 
-func NewAuthUseCases(authService AuthService, userRepository UserRepository, userRestrictionService UserRestrictionService) AuthUseCases {
+func NewAuthUseCases(authService contracts.AuthService, userRepository contracts.UserRepository, userRestrictionService contracts.UserRestrictionService) AuthUseCases {
 	return AuthUseCases{
 		authService:            authService,
 		userRepository:         userRepository,

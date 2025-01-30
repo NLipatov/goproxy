@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain/events"
 	"goproxy/infrastructure/config"
 	"log"
@@ -16,7 +16,7 @@ type KafkaService struct {
 	topics   []string
 }
 
-func NewKafkaService(kafkaConfig config.KafkaConfig) (application.MessageBusService, error) {
+func NewKafkaService(kafkaConfig config.KafkaConfig) (contracts.MessageBusService, error) {
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers":  kafkaConfig.BootstrapServers,
 		"group.id":           kafkaConfig.GroupID,

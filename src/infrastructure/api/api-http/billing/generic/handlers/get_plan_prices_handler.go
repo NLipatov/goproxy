@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/infrastructure/api/api-http/plans/plans_dto"
 	"log"
 	"net/http"
@@ -10,10 +10,10 @@ import (
 )
 
 type GetPlanPricesHandler struct {
-	planPriceRepository application.PlanPriceRepository
+	planPriceRepository contracts.PlanPriceRepository
 }
 
-func NewGetPlanPricesHandler(planPriceRepository application.PlanPriceRepository) GetPlanPricesHandler {
+func NewGetPlanPricesHandler(planPriceRepository contracts.PlanPriceRepository) GetPlanPricesHandler {
 	return GetPlanPricesHandler{
 		planPriceRepository: planPriceRepository,
 	}

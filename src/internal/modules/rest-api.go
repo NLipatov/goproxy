@@ -2,7 +2,7 @@ package modules
 
 import (
 	"database/sql"
-	"goproxy/application"
+	"goproxy/application/use_cases"
 	"goproxy/dal"
 	"goproxy/dal/cache"
 	"goproxy/dal/repositories"
@@ -56,7 +56,7 @@ func (api *UsersApi) Start() {
 	userRepo := repositories.NewUserRepository(db, userRepositoryCache)
 
 	cryptoService := services.GetCryptoService()
-	useCases := application.NewUserUseCases(userRepo, cryptoService)
+	useCases := use_cases.NewUserUseCases(userRepo, cryptoService)
 
 	usersController := users.NewUsersController(useCases)
 	usersController.Listen(port)

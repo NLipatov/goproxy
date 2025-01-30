@@ -2,7 +2,7 @@ package api_ws
 
 import (
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/use_cases"
 	"goproxy/infrastructure/api/CORS"
 	"log"
 	"net/http"
@@ -13,7 +13,7 @@ type PlanController struct {
 	corsManager CORS.CORSManager
 }
 
-func NewPlanController(userPlanInfoUseCases application.UserPlanInfoUseCases, usersApiHost string) *PlanController {
+func NewPlanController(userPlanInfoUseCases use_cases.UserPlanInfoUseCases, usersApiHost string) *PlanController {
 	return &PlanController{
 		wsHandler:   NewWSHandler(userPlanInfoUseCases, usersApiHost),
 		corsManager: CORS.NewCORSManager(),

@@ -1,8 +1,9 @@
-package application
+package use_cases
 
 import (
 	"fmt"
 	"goproxy/application/commands"
+	"goproxy/application/contracts"
 	"goproxy/domain/aggregates"
 	"strconv"
 	"strings"
@@ -17,11 +18,11 @@ type UserUseCasesContract interface {
 }
 
 type UserUseCases struct {
-	repo          UserRepository
-	cryptoService CryptoService
+	repo          contracts.UserRepository
+	cryptoService contracts.CryptoService
 }
 
-func NewUserUseCases(repo UserRepository, cryptoService CryptoService) UserUseCases {
+func NewUserUseCases(repo contracts.UserRepository, cryptoService contracts.CryptoService) UserUseCases {
 	return UserUseCases{
 		repo:          repo,
 		cryptoService: cryptoService,

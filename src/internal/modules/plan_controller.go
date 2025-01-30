@@ -3,7 +3,7 @@ package modules
 import (
 	"context"
 	"database/sql"
-	"goproxy/application"
+	"goproxy/application/use_cases"
 	"goproxy/dal"
 	"goproxy/dal/cache"
 	"goproxy/dal/cache_serialization"
@@ -71,7 +71,7 @@ func (p *PlanController) Start() {
 	}
 
 	userRepo := repositories.NewUserRepository(db, bigCache)
-	userPlanInfoUseCases := application.NewUserPlanInfoUseCases(planRepo, userPlanRepo, userRepo, planCache, trafficCache)
+	userPlanInfoUseCases := use_cases.NewUserPlanInfoUseCases(planRepo, userPlanRepo, userRepo, planCache, trafficCache)
 
 	planAssignedEventProcessorErr := PlanAssignedEvent.
 		NewPlanAssignedProcessor(domain.PLAN, planCache, userPlanRepo, userRepo, planRepo, trafficCache, usersRestApiHost).

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/use_cases"
 	"goproxy/domain/aggregates"
 	"goproxy/infrastructure/dto"
 	"io"
@@ -15,7 +15,7 @@ import (
 )
 
 type Handler struct {
-	userUseCases application.UserUseCasesContract
+	userUseCases use_cases.UserUseCasesContract
 }
 
 func (l *Handler) PostUser(w http.ResponseWriter, r *http.Request) {

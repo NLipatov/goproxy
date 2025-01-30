@@ -3,7 +3,7 @@ package modules
 import (
 	"context"
 	"database/sql"
-	"goproxy/application"
+	"goproxy/application/use_cases"
 	"goproxy/dal"
 	"goproxy/dal/cache"
 	"goproxy/dal/repositories"
@@ -75,7 +75,7 @@ func (p *Proxy) Start() {
 	}
 
 	authService := services.NewAuthService(cryptoService, authCache)
-	authUseCases := application.NewAuthUseCases(authService, userRepo, userRestrictionService)
+	authUseCases := use_cases.NewAuthUseCases(authService, userRepo, userRestrictionService)
 
 	go userRestrictionService.ProcessEvents()
 
@@ -83,6 +83,6 @@ func (p *Proxy) Start() {
 	dialerPool.StartExploringNewPublicIps(context.Background(), time.Hour*8)
 	proxy := services.NewProxy(dialerPool)
 	listener := infrastructure.NewHttpListener(proxy)
-	proxyUseCases := application.NewProxyUseCases(proxy, listener, authUseCases)
+	proxyUseCases := use_cases.NewProxyUseCases(proxy, listener, authUseCases)
 	proxyUseCases.ServeOnPort(port)
 }

@@ -2,7 +2,7 @@ package modules
 
 import (
 	"database/sql"
-	"goproxy/application"
+	"goproxy/application/use_cases"
 	"goproxy/dal"
 	"goproxy/dal/cache"
 	"goproxy/dal/repositories"
@@ -56,7 +56,7 @@ func (api *GoogleAuthAPI) Start() {
 
 	userRepo := repositories.NewUserRepository(db, userRepositoryCache)
 	cryptoService := services.GetCryptoService()
-	userUseCases := application.NewUserUseCases(userRepo, cryptoService)
+	userUseCases := use_cases.NewUserUseCases(userRepo, cryptoService)
 	authService := google_auth.NewGoogleAuthService(userUseCases, cryptoService, messageBusService)
 	controller := google_auth.NewGoogleAuthController(authService)
 	controller.Listen(oauthConfig.Port)

@@ -4,16 +4,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain/aggregates"
 )
 
 type UserRepository struct {
 	db    *sql.DB
-	cache application.Cache[aggregates.User]
+	cache contracts.Cache[aggregates.User]
 }
 
-func NewUserRepository(db *sql.DB, cache application.Cache[aggregates.User]) *UserRepository {
+func NewUserRepository(db *sql.DB, cache contracts.Cache[aggregates.User]) *UserRepository {
 	return &UserRepository{
 		db:    db,
 		cache: cache,

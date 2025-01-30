@@ -1,7 +1,7 @@
 package crypto_cloud_api
 
 import (
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_handlers"
 )
@@ -9,10 +9,10 @@ import (
 type CryptoCloudService struct {
 	createInvoiceHandler crypto_cloud_handlers.CreateInvoiceHandler
 	postBackHandler      crypto_cloud_handlers.PostBackHandler
-	messageBus           application.MessageBusService
+	messageBus           contracts.MessageBusService
 }
 
-func NewCryptoCloudService(messageBus application.MessageBusService) *CryptoCloudService {
+func NewCryptoCloudService(messageBus contracts.MessageBusService) *CryptoCloudService {
 	return &CryptoCloudService{
 		messageBus:           messageBus,
 		postBackHandler:      crypto_cloud_handlers.NewPostBackHandler(messageBus),

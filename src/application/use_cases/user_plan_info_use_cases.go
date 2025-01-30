@@ -1,21 +1,22 @@
-package application
+package use_cases
 
 import (
 	"fmt"
+	"goproxy/application/contracts"
 	"goproxy/domain/dataobjects"
 	"log"
 )
 
 type UserPlanInfoUseCases struct {
-	planRepository     PlanRepository
-	userPlanRepository UserPlanRepository
-	userRepository     UserRepository
-	planCache          CacheWithTTL[dataobjects.UserPlan]
-	trafficCache       CacheWithTTL[dataobjects.UserTraffic]
+	planRepository     contracts.PlanRepository
+	userPlanRepository contracts.UserPlanRepository
+	userRepository     contracts.UserRepository
+	planCache          contracts.CacheWithTTL[dataobjects.UserPlan]
+	trafficCache       contracts.CacheWithTTL[dataobjects.UserTraffic]
 }
 
-func NewUserPlanInfoUseCases(planRepository PlanRepository, userPlanRepository UserPlanRepository,
-	userRepository UserRepository, planCache CacheWithTTL[dataobjects.UserPlan], trafficCache CacheWithTTL[dataobjects.UserTraffic]) UserPlanInfoUseCases {
+func NewUserPlanInfoUseCases(planRepository contracts.PlanRepository, userPlanRepository contracts.UserPlanRepository,
+	userRepository contracts.UserRepository, planCache contracts.CacheWithTTL[dataobjects.UserPlan], trafficCache contracts.CacheWithTTL[dataobjects.UserTraffic]) UserPlanInfoUseCases {
 	return UserPlanInfoUseCases{
 		planRepository:     planRepository,
 		userPlanRepository: userPlanRepository,

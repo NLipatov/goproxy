@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain"
 	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure/config"
@@ -13,15 +14,15 @@ import (
 
 type Processor struct {
 	boundedContext     domain.BoundedContexts
-	cache              application.CacheWithTTL[dataobjects.UserTraffic]
-	userPlanRepository application.UserPlanRepository
-	planRepository     application.PlanRepository
-	messageBus         application.MessageBusService
+	cache              contracts.CacheWithTTL[dataobjects.UserTraffic]
+	userPlanRepository contracts.UserPlanRepository
+	planRepository     contracts.PlanRepository
+	messageBus         contracts.MessageBusService
 }
 
-func NewUserConsumedTrafficEventProcessor(cache application.CacheWithTTL[dataobjects.UserTraffic],
-	userPlanRepository application.UserPlanRepository,
-	planRepository application.PlanRepository,
+func NewUserConsumedTrafficEventProcessor(cache contracts.CacheWithTTL[dataobjects.UserTraffic],
+	userPlanRepository contracts.UserPlanRepository,
+	planRepository contracts.PlanRepository,
 	boundedContext domain.BoundedContexts) *Processor {
 
 	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(boundedContext)

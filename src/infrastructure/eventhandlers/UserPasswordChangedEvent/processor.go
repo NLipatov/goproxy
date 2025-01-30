@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain"
 	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/services"
@@ -12,10 +13,10 @@ import (
 
 type Processor[T any] struct {
 	boundedContext domain.BoundedContexts
-	cache          application.Cache[T]
+	cache          contracts.Cache[T]
 }
 
-func NewUserPasswordChangedEventProcessor[T any](boundedContext domain.BoundedContexts, cache application.Cache[T]) *Processor[T] {
+func NewUserPasswordChangedEventProcessor[T any](boundedContext domain.BoundedContexts, cache contracts.Cache[T]) *Processor[T] {
 	return &Processor[T]{
 		boundedContext,
 		cache,

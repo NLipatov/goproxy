@@ -3,7 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/events"
@@ -15,9 +15,9 @@ import (
 )
 
 type UserRestrictionService struct {
-	localCache  application.CacheWithTTL[bool]
-	messageBus  application.MessageBusService
-	remoteCache application.CacheWithTTL[bool]
+	localCache  contracts.CacheWithTTL[bool]
+	messageBus  contracts.MessageBusService
+	remoteCache contracts.CacheWithTTL[bool]
 }
 
 var remoteCacheLocks sync.Map
@@ -89,7 +89,7 @@ func (u *UserRestrictionService) AddToRestrictionList(user aggregates.User) erro
 	return nil
 }
 
-func (u *UserRestrictionService) setToCacheWithTTL(cache application.CacheWithTTL[bool], userId int, restricted bool) error {
+func (u *UserRestrictionService) setToCacheWithTTL(cache contracts.CacheWithTTL[bool], userId int, restricted bool) error {
 	key := u.UserIdToKey(userId)
 	setErr := cache.Set(key, restricted)
 	if setErr != nil {
@@ -118,7 +118,7 @@ func (u *UserRestrictionService) RemoveFromRestrictionList(user aggregates.User)
 }
 
 func (u *UserRestrictionService) ProcessEvents() {
-	defer func(messageBus application.MessageBusService) {
+	defer func(messageBus contracts.MessageBusService) {
 		_ = messageBus.Close()
 	}(u.messageBus)
 

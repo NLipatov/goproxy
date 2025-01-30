@@ -2,7 +2,7 @@ package api
 
 import (
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/application/payments/crypto_cloud"
 	"goproxy/infrastructure/api/CORS"
 	handlers2 "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/api/handlers"
@@ -19,8 +19,8 @@ type Controller struct {
 }
 
 func NewController(cryptoCloudService crypto_cloud.PaymentProvider,
-	planPriceRepository application.PlanPriceRepository, orderRepository application.OrderRepository,
-	messageBus application.MessageBusService) *Controller {
+	planPriceRepository contracts.PlanPriceRepository, orderRepository contracts.OrderRepository,
+	messageBus contracts.MessageBusService) *Controller {
 	cryptoCloudMessageBusService := services2.NewCryptoCloudMessageBusService(messageBus)
 	billingService := services2.NewBillingService(orderRepository, planPriceRepository, cryptoCloudService, cryptoCloudMessageBusService)
 	postbackService := services2.NewPostbackService(orderRepository, planPriceRepository, cryptoCloudService, cryptoCloudMessageBusService)

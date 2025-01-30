@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/dataobjects"
@@ -16,16 +17,16 @@ import (
 )
 
 type Handler struct {
-	cache              application.CacheWithTTL[dataobjects.UserTraffic]
-	userPlanRepository application.UserPlanRepository
-	planRepository     application.PlanRepository
-	messageBus         application.MessageBusService
+	cache              contracts.CacheWithTTL[dataobjects.UserTraffic]
+	userPlanRepository contracts.UserPlanRepository
+	planRepository     contracts.PlanRepository
+	messageBus         contracts.MessageBusService
 }
 
-func NewUserConsumedTrafficEventHandler(cache application.CacheWithTTL[dataobjects.UserTraffic],
-	userPlanRepository application.UserPlanRepository,
-	planRepository application.PlanRepository,
-	messageBus application.MessageBusService) application.EventHandler {
+func NewUserConsumedTrafficEventHandler(cache contracts.CacheWithTTL[dataobjects.UserTraffic],
+	userPlanRepository contracts.UserPlanRepository,
+	planRepository contracts.PlanRepository,
+	messageBus contracts.MessageBusService) application.EventHandler {
 	return &Handler{
 		cache:              cache,
 		userPlanRepository: userPlanRepository,

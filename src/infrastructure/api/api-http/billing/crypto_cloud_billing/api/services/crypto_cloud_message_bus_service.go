@@ -3,17 +3,17 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain"
 	"goproxy/domain/events"
 	"time"
 )
 
 type CryptoCloudMessageBusService struct {
-	messageBus application.MessageBusService
+	messageBus contracts.MessageBusService
 }
 
-func NewCryptoCloudMessageBusService(messageBus application.MessageBusService) CryptoCloudMessageBusService {
+func NewCryptoCloudMessageBusService(messageBus contracts.MessageBusService) CryptoCloudMessageBusService {
 	return CryptoCloudMessageBusService{
 		messageBus: messageBus,
 	}

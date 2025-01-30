@@ -3,7 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/application/payments/crypto_cloud"
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/domain/dataobjects"
@@ -15,14 +15,14 @@ import (
 )
 
 type BillingService struct {
-	orderRepository     application.OrderRepository
-	planPriceRepository application.PlanPriceRepository
+	orderRepository     contracts.OrderRepository
+	planPriceRepository contracts.PlanPriceRepository
 	paymentService      crypto_cloud.PaymentProvider
 	messageBusService   CryptoCloudMessageBusService
 }
 
-func NewBillingService(orderRepository application.OrderRepository,
-	planPriceRepository application.PlanPriceRepository,
+func NewBillingService(orderRepository contracts.OrderRepository,
+	planPriceRepository contracts.PlanPriceRepository,
 	paymentService crypto_cloud.PaymentProvider,
 	messageBusService CryptoCloudMessageBusService) BillingService {
 	return BillingService{

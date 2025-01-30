@@ -3,7 +3,7 @@ package PlanAssignedEvent
 import (
 	"encoding/json"
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/dataobjects"
 	"goproxy/domain/events"
@@ -14,21 +14,21 @@ import (
 )
 
 type PlanAssignedHandler struct {
-	messageBus         application.MessageBusService
-	userPlanCache      application.CacheWithTTL[dataobjects.UserPlan]
-	userPlanRepository application.UserPlanRepository
-	userRepository     application.UserRepository
-	planRepository     application.PlanRepository
-	trafficCache       application.CacheWithTTL[dataobjects.UserTraffic]
+	messageBus         contracts.MessageBusService
+	userPlanCache      contracts.CacheWithTTL[dataobjects.UserPlan]
+	userPlanRepository contracts.UserPlanRepository
+	userRepository     contracts.UserRepository
+	planRepository     contracts.PlanRepository
+	trafficCache       contracts.CacheWithTTL[dataobjects.UserTraffic]
 	userApiHost        string
 }
 
-func NewPlanAssignedHandler(messageBus application.MessageBusService,
-	userPlanCache application.CacheWithTTL[dataobjects.UserPlan],
-	userPlanRepository application.UserPlanRepository,
-	userRepository application.UserRepository,
-	planRepository application.PlanRepository,
-	trafficCache application.CacheWithTTL[dataobjects.UserTraffic],
+func NewPlanAssignedHandler(messageBus contracts.MessageBusService,
+	userPlanCache contracts.CacheWithTTL[dataobjects.UserPlan],
+	userPlanRepository contracts.UserPlanRepository,
+	userRepository contracts.UserRepository,
+	planRepository contracts.PlanRepository,
+	trafficCache contracts.CacheWithTTL[dataobjects.UserTraffic],
 	userApiHost string) *PlanAssignedHandler {
 	return &PlanAssignedHandler{
 		messageBus,

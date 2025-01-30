@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain"
 	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure/config"
@@ -13,21 +14,21 @@ import (
 
 type PlanAssignedProcessor struct {
 	boundedContext     domain.BoundedContexts
-	messageBus         application.MessageBusService
-	userPlanCache      application.CacheWithTTL[dataobjects.UserPlan]
-	userPlanRepository application.UserPlanRepository
-	userRepository     application.UserRepository
-	planRepository     application.PlanRepository
-	trafficCache       application.CacheWithTTL[dataobjects.UserTraffic]
+	messageBus         contracts.MessageBusService
+	userPlanCache      contracts.CacheWithTTL[dataobjects.UserPlan]
+	userPlanRepository contracts.UserPlanRepository
+	userRepository     contracts.UserRepository
+	planRepository     contracts.PlanRepository
+	trafficCache       contracts.CacheWithTTL[dataobjects.UserTraffic]
 	userApiHost        string
 }
 
 func NewPlanAssignedProcessor(boundedContext domain.BoundedContexts,
-	userPlanCache application.CacheWithTTL[dataobjects.UserPlan],
-	userPlanRepository application.UserPlanRepository,
-	userRepository application.UserRepository,
-	planRepository application.PlanRepository,
-	trafficCache application.CacheWithTTL[dataobjects.UserTraffic],
+	userPlanCache contracts.CacheWithTTL[dataobjects.UserPlan],
+	userPlanRepository contracts.UserPlanRepository,
+	userRepository contracts.UserRepository,
+	planRepository contracts.PlanRepository,
+	trafficCache contracts.CacheWithTTL[dataobjects.UserTraffic],
 	userApiHost string) *PlanAssignedProcessor {
 	kafkaConfig, kafkaConfigErr := config.NewKafkaConfig(boundedContext)
 	if kafkaConfigErr != nil {

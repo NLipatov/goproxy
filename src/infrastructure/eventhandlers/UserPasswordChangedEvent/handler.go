@@ -3,15 +3,16 @@ package UserPasswordChangedEvent
 import (
 	"encoding/json"
 	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain/events"
 	"log"
 )
 
 type Handler[T any] struct {
-	cache application.Cache[T]
+	cache contracts.Cache[T]
 }
 
-func NewUserPasswordChangedEventHandler[T any](cache application.Cache[T]) application.EventHandler {
+func NewUserPasswordChangedEventHandler[T any](cache contracts.Cache[T]) application.EventHandler {
 	return &Handler[T]{
 		cache: cache,
 	}

@@ -2,7 +2,7 @@ package generic
 
 import (
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/infrastructure/api/CORS"
 	"goproxy/infrastructure/api/api-http/billing/generic/handlers"
 	"log"
@@ -14,7 +14,7 @@ type Controller struct {
 	corsManager          CORS.CORSManager
 }
 
-func NewBillingController(planPriceRepository application.PlanPriceRepository) *Controller {
+func NewBillingController(planPriceRepository contracts.PlanPriceRepository) *Controller {
 	return &Controller{
 		getPlanPricesHandler: handlers.NewGetPlanPricesHandler(planPriceRepository),
 		corsManager:          CORS.NewCORSManager(),

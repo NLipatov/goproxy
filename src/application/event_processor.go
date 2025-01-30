@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"goproxy/application/contracts"
 	"log"
 )
 
@@ -12,12 +13,12 @@ type EventHandler interface {
 }
 
 type EventProcessor struct {
-	messageBus MessageBusService
+	messageBus contracts.MessageBusService
 	handlerMap map[string]EventHandler
 	topics     []string
 }
 
-func NewEventProcessor(messageBus MessageBusService) *EventProcessor {
+func NewEventProcessor(messageBus contracts.MessageBusService) *EventProcessor {
 	return &EventProcessor{
 		messageBus: messageBus,
 		handlerMap: make(map[string]EventHandler),
@@ -52,7 +53,7 @@ func (e *EventProcessor) Start(ctx context.Context) error {
 	}
 
 	go func() {
-		defer func(messageBus MessageBusService) {
+		defer func(messageBus contracts.MessageBusService) {
 			_ = messageBus.Close()
 		}(e.messageBus)
 

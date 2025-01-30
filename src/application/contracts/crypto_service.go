@@ -1,4 +1,4 @@
-package application
+package contracts
 
 type CryptoService interface {
 	GenerateRandomString(length int) (string, error)

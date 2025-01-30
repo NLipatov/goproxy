@@ -3,7 +3,7 @@ package crypto_cloud_handlers
 import (
 	"encoding/json"
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/domain"
 	"goproxy/domain/events"
@@ -13,11 +13,11 @@ import (
 
 type PostBackHandler struct {
 	config     crypto_cloud_configuration.Configuration
-	jwt        application.Jwt
-	messageBus application.MessageBusService
+	jwt        contracts.Jwt
+	messageBus contracts.MessageBusService
 }
 
-func NewPostBackHandler(messageBus application.MessageBusService) PostBackHandler {
+func NewPostBackHandler(messageBus contracts.MessageBusService) PostBackHandler {
 	return PostBackHandler{
 		jwt:        services.NewHS256Jwt(),
 		config:     crypto_cloud_configuration.NewConfiguration(),

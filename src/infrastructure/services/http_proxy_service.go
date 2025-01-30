@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"context"
 	"errors"
-	"goproxy/application"
 	"goproxy/application/aplication_errors"
+	"goproxy/application/contracts"
 	"goproxy/infrastructure/config"
 	"goproxy/infrastructure/infraerrs"
 	"io"
@@ -21,8 +21,8 @@ import (
 const connectionReadDeadLine = time.Second * 30
 
 type Proxy struct {
-	rateLimiter     application.RateLimiterService
-	dialerService   application.DialerPool
+	rateLimiter     contracts.RateLimiterService
+	dialerService   contracts.DialerPool
 	trafficReporter *TrafficReporter
 }
 
@@ -33,7 +33,7 @@ var bufPool = sync.Pool{
 	},
 }
 
-func NewProxy(dialerService application.DialerPool) *Proxy {
+func NewProxy(dialerService contracts.DialerPool) *Proxy {
 	rateLimiterConfig := config.LoadRateLimiterConfig()
 	trafficReporter, trafficReporterErr := NewTrafficReporter()
 	if trafficReporterErr != nil {

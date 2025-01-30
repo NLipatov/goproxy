@@ -1,7 +1,8 @@
-package application
+package use_cases
 
 import (
 	"fmt"
+	"goproxy/application/contracts"
 	"goproxy/dal/cache_serialization"
 	"goproxy/domain/lavatopsubdomain/lavatopaggregates"
 	"goproxy/domain/lavatopsubdomain/lavatopvalueobjects"
@@ -13,14 +14,14 @@ const (
 )
 
 type LavaTopUseCases struct {
-	invoiceRepository    InvoiceRepository[lavatopaggregates.Invoice]
-	billingService       BillingService[lavatopaggregates.Invoice, lavatopvalueobjects.Offer]
-	cache                CacheWithTTL[[]cache_serialization.LavaTopOfferDto]
+	invoiceRepository    contracts.InvoiceRepository[lavatopaggregates.Invoice]
+	billingService       contracts.BillingService[lavatopaggregates.Invoice, lavatopvalueobjects.Offer]
+	cache                contracts.CacheWithTTL[[]cache_serialization.LavaTopOfferDto]
 	offerCacheSerializer cache_serialization.CacheSerializer[lavatopvalueobjects.Offer, cache_serialization.LavaTopOfferDto]
 }
 
-func NewLavaTopUseCases(billingService BillingService[lavatopaggregates.Invoice, lavatopvalueobjects.Offer],
-	cache CacheWithTTL[[]cache_serialization.LavaTopOfferDto]) LavaTopUseCases {
+func NewLavaTopUseCases(billingService contracts.BillingService[lavatopaggregates.Invoice, lavatopvalueobjects.Offer],
+	cache contracts.CacheWithTTL[[]cache_serialization.LavaTopOfferDto]) LavaTopUseCases {
 	return LavaTopUseCases{
 		billingService:       billingService,
 		cache:                cache,

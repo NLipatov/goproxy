@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/dal/cache_serialization"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/valueobjects"
@@ -92,11 +92,11 @@ WHERE plans.name = $1;
 
 type PlanRepository struct {
 	db                  *sql.DB
-	cache               application.CacheWithTTL[[]cache_serialization.PlanDto]
+	cache               contracts.CacheWithTTL[[]cache_serialization.PlanDto]
 	planCacheSerializer cache_serialization.CacheSerializer[aggregates.Plan, cache_serialization.PlanDto]
 }
 
-func NewPlansRepository(db *sql.DB, cache application.CacheWithTTL[[]cache_serialization.PlanDto]) application.PlanRepository {
+func NewPlansRepository(db *sql.DB, cache contracts.CacheWithTTL[[]cache_serialization.PlanDto]) contracts.PlanRepository {
 	return &PlanRepository{
 		db:                  db,
 		cache:               cache,

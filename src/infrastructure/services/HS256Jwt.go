@@ -3,14 +3,14 @@ package services
 import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v4"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"time"
 )
 
 type HS256Jwt struct {
 }
 
-func NewHS256Jwt() application.Jwt {
+func NewHS256Jwt() contracts.Jwt {
 	return HS256Jwt{}
 }
 

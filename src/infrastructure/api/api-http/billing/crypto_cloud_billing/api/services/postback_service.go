@@ -2,7 +2,7 @@ package services
 
 import (
 	"encoding/json"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/application/payments/crypto_cloud"
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_api_dto"
@@ -13,14 +13,14 @@ import (
 )
 
 type PostbackService struct {
-	orderRepository     application.OrderRepository
-	planPriceRepository application.PlanPriceRepository
+	orderRepository     contracts.OrderRepository
+	planPriceRepository contracts.PlanPriceRepository
 	paymentService      crypto_cloud.PaymentProvider
 	messageBusService   CryptoCloudMessageBusService
 }
 
-func NewPostbackService(orderRepository application.OrderRepository,
-	planPriceRepository application.PlanPriceRepository,
+func NewPostbackService(orderRepository contracts.OrderRepository,
+	planPriceRepository contracts.PlanPriceRepository,
 	paymentService crypto_cloud.PaymentProvider,
 	messageBusService CryptoCloudMessageBusService) PostbackService {
 	return PostbackService{

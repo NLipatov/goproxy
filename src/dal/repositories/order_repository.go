@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain/dataobjects"
 	"goproxy/domain/valueobjects"
 )
@@ -40,7 +40,7 @@ type OrderRepository struct {
 	db *sql.DB
 }
 
-func NewOrderRepository(db *sql.DB) application.OrderRepository {
+func NewOrderRepository(db *sql.DB) contracts.OrderRepository {
 	return &OrderRepository{db: db}
 }
 

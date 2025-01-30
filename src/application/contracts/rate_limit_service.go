@@ -1,4 +1,4 @@
-package application
+package contracts
 
 type RateLimiterService interface {
 	Allow(userID int, target string, tokens int64) bool
