@@ -2,7 +2,7 @@ package plans
 
 import (
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/infrastructure/api/CORS"
 	"goproxy/infrastructure/api/api-http/plans/plans_handlers"
 	"log"
@@ -14,7 +14,7 @@ type Controller struct {
 	corsManager     CORS.CORSManager
 }
 
-func NewPlansController(planRepository application.PlanRepository) *Controller {
+func NewPlansController(planRepository contracts.PlanRepository) *Controller {
 	return &Controller{
 		corsManager:     CORS.NewCORSManager(),
 		getPlansHandler: plans_handlers.NewHandler(planRepository),

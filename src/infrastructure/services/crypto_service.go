@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"goproxy/application/contracts"
 	"log"
 	"math"
 	"runtime"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/shirou/gopsutil/mem"
 	"golang.org/x/crypto/argon2"
-	"goproxy/application"
 )
 
 // CryptoServiceImpl implements the CryptoService interface.
@@ -28,12 +28,12 @@ type CryptoServiceImpl struct {
 }
 
 var (
-	cryptoServiceInstance application.CryptoService
+	cryptoServiceInstance contracts.CryptoService
 	once                  sync.Once
 )
 
 // GetCryptoService returns the singleton instance of CryptoService.
-func GetCryptoService() application.CryptoService {
+func GetCryptoService() contracts.CryptoService {
 	once.Do(func() {
 		memory, iterations, parallelism := determineArgon2idParameters()
 

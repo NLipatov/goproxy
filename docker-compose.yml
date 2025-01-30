@@ -4,9 +4,10 @@ networks:
     driver: bridge
 
 services:
-  postgres:
+  # DBs
+  proxy-postgres:
     image: postgres:17.2-bookworm
-    container_name: postgres
+    container_name: proxy-postgres
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASS}
@@ -14,7 +15,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - proxy-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
@@ -31,7 +32,7 @@ services:
     ports:
       - "5434:5432"
     volumes:
-      - plan-postgres_data:/var/lib/postgresql/data
+      - plan-proxy-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
       interval: 10s
@@ -48,17 +49,18 @@ services:
     ports:
       - "5435:5432"
     volumes:
-      - billing-postgres_data:/var/lib/postgresql/data
+      - billing-proxy-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
       interval: 10s
       timeout: 5s
       retries: 5
-
-  auth-ctx-migrator:
+  
+  # DB migrators
+  proxy-ctx-migrator:
     build:
       context: ./src
-    container_name: auth-ctx-migrator
+    container_name: proxy-ctx-migrator
     environment:
       - MODE=migrator
       - DB_DATABASE=${DB_DATABASE}
@@ -67,7 +69,7 @@ services:
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
     depends_on:
-      postgres:
+      proxy-postgres:
         condition: service_healthy
 
   plans-ctx-migrator:
@@ -100,6 +102,7 @@ services:
       billing-postgres:
         condition: service_healthy
   
+  # Services
   google-auth-api:
     build:
       context: ./src
@@ -109,7 +112,7 @@ services:
     environment:
       - MODE=google-auth
       - SERVE_PORT=3030
-      - ALLOWED_ORIGINS=http://localhost:5173
+      - ALLOWED_ORIGINS=${UI_BASE_URL}
       - DB_DATABASE=${DB_DATABASE}
       - DB_USER=${DB_USER}
       - DB_PASS=${DB_PASS}
@@ -128,7 +131,7 @@ services:
       - TC_CACHE_PORT=${TC_CACHE_PORT}
       - TC_CACHE_USER=${TC_CACHE_USER}
     depends_on:
-      postgres:
+      proxy-postgres:
         condition: service_healthy
       plan-controller-cache:
         condition: service_healthy
@@ -159,7 +162,7 @@ services:
     depends_on:
       init-kafka-topics:
           condition: service_completed_successfully
-      auth-ctx-migrator:
+      proxy-ctx-migrator:
         condition: service_completed_successfully
 
   rest-api:
@@ -182,7 +185,7 @@ services:
       - PROXY_KAFKA_TOPIC=${USERS_REST_API_KAFKA_TOPIC} 
       - ALLOWED_ORIGINS=*
     depends_on:
-      - auth-ctx-migrator
+      - proxy-ctx-migrator
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.8.0
@@ -256,7 +259,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - plan-controller-cache_data:/data
+      - plan-controller-cache-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
@@ -270,7 +273,7 @@ services:
       ports:
         - "6380:6379"
       volumes:
-        - billing-cache_data:/data
+        - billing-cache-data:/data
       healthcheck:
         test: ["CMD", "redis-cli", "ping"]
         interval: 30s
@@ -287,7 +290,7 @@ services:
     environment:
       - MODE=billing-api
       - HTTP_PORT=4040
-      - ALLOWED_ORIGINS=*
+      - ALLOWED_ORIGINS=${UI_BASE_URL}
       - DB_DATABASE=${BILLING_DB_DATABASE}
       - DB_HOST=${BILLING_DB_HOST}
       - DB_PASS=${BILLING_DB_PASS}
@@ -315,7 +318,7 @@ services:
     environment:
       - MODE=plans-api
       - HTTP_PORT=9090
-      - ALLOWED_ORIGINS=*
+      - ALLOWED_ORIGINS=${UI_BASE_URL}
       - DB_DATABASE=${PLANS_DB_DATABASE}
       - DB_HOST=${PLANS_DB_HOST}
       - DB_PASS=${PLANS_DB_PASS}
@@ -341,6 +344,15 @@ services:
     environment:
       - MODE=crypto-cloud-billing-api
       - HTTP_PORT=2020
+      - DB_USER=${BILLING_DB_USER}
+      - DB_PASS=${BILLING_DB_PASS}
+      - DB_DATABASE=${BILLING_DB_DATABASE}
+      - DB_HOST=${BILLING_DB_HOST}
+      - DB_PORT=${BILLING_DB_PORT}
+      - TC_CACHE_HOST=${BILLING_CACHE_HOST}
+      - TC_CACHE_PORT=${BILLING_CACHE_PORT}
+      - TC_CACHE_USER=${BILLING_CACHE_USER}
+      - TC_CACHE_PASSWORD=${BILLING_CACHE_PASSWORD}
       - ALLOWED_ORIGINS=${CC_BILLING_ALLOWED_ORIGINS}
       - BILLING_KAFKA_AUTO_OFFSET_RESET=${CC_BILLING_KAFKA_AUTO_OFFSET_RESET}
       - BILLING_KAFKA_BOOTSTRAP_SERVERS=${CC_BILLING_KAFKA_BOOTSTRAP_SERVERS}
@@ -384,7 +396,7 @@ services:
       - TC_CACHE_PORT=${TC_CACHE_PORT}
       - TC_CACHE_USER=${TC_CACHE_USER}
       - TC_CACHE_PASSWORD=${TC_CACHE_PASSWORD}
-      - ALLOWED_ORIGINS=http://localhost:5173
+      - ALLOWED_ORIGINS=${UI_BASE_URL}
     depends_on:
       init-kafka-topics:
         condition: service_completed_successfully
@@ -396,8 +408,8 @@ services:
         condition: service_healthy
 
 volumes:
-  postgres_data:
-  plan-postgres_data: 
-  billing-postgres_data:
-  plan-controller-cache_data:
-  billing-cache_data:
+  proxy-postgres-data:
+  plan-proxy-postgres-data: 
+  billing-proxy-postgres-data:
+  plan-controller-cache-data:
+  billing-cache-data:

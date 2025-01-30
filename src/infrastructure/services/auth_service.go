@@ -3,7 +3,7 @@ package services
 import (
 	"fmt"
 	"golang.org/x/sync/singleflight"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/valueobjects"
 	"os"
@@ -19,13 +19,13 @@ type ValidateResult struct {
 }
 
 type AuthService struct {
-	cryptoService     application.CryptoService
-	validateCache     application.CacheWithTTL[ValidateResult]
+	cryptoService     contracts.CryptoService
+	validateCache     contracts.CacheWithTTL[ValidateResult]
 	validateCacheTTL  time.Duration
 	singleFlightGroup singleflight.Group
 }
 
-func NewAuthService(cryptoService application.CryptoService, cache application.CacheWithTTL[ValidateResult]) *AuthService {
+func NewAuthService(cryptoService contracts.CryptoService, cache contracts.CacheWithTTL[ValidateResult]) *AuthService {
 	validateCacheTTL := defaultValidateCacheTTL
 	validateTtlEnv := os.Getenv("AUTH_SERVICE_VALIDATE_TTL_MS")
 	if validateTtlEnv != "" {

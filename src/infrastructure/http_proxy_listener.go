@@ -2,16 +2,16 @@ package infrastructure
 
 import (
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"log"
 	"net"
 )
 
 type HttpListener struct {
-	httpProxyService application.HttpProxyService
+	httpProxyService contracts.HttpProxyService
 }
 
-func NewHttpListener(proxy application.HttpProxyService) *HttpListener {
+func NewHttpListener(proxy contracts.HttpProxyService) *HttpListener {
 	return &HttpListener{
 		httpProxyService: proxy,
 	}

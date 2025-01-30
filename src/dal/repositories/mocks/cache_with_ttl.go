@@ -2,7 +2,7 @@ package mocks
 
 import (
 	"errors"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"sync"
 	"time"
 )
@@ -17,7 +17,7 @@ type MockCacheWithTTL[T any] struct {
 	mutex sync.RWMutex
 }
 
-func NewMockCacheWithTTL[T any]() application.CacheWithTTL[T] {
+func NewMockCacheWithTTL[T any]() contracts.CacheWithTTL[T] {
 	return &MockCacheWithTTL[T]{
 		data: make(map[string]mockCacheItem[T]),
 	}

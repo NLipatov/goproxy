@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/dal/cache_serialization"
 	"goproxy/domain/dataobjects"
 	"time"
@@ -41,11 +41,11 @@ WHERE id = $1
 
 type PlanPriceRepository struct {
 	db         *sql.DB
-	cache      application.CacheWithTTL[[]cache_serialization.PriceDto]
+	cache      contracts.CacheWithTTL[[]cache_serialization.PriceDto]
 	serializer cache_serialization.CacheSerializer[dataobjects.PlanPrice, cache_serialization.PriceDto]
 }
 
-func NewPlanPriceRepository(db *sql.DB, cache application.CacheWithTTL[[]cache_serialization.PriceDto]) application.PlanPriceRepository {
+func NewPlanPriceRepository(db *sql.DB, cache contracts.CacheWithTTL[[]cache_serialization.PriceDto]) contracts.PlanPriceRepository {
 	return &PlanPriceRepository{
 		db:         db,
 		cache:      cache,
@@ -100,7 +100,7 @@ func (p *PlanPriceRepository) Update(entity dataobjects.PlanPrice) error {
 		return fmt.Errorf("could not update plan price: %s", resultErr)
 	}
 
-	rowsAffectedErr := checkRowsAffected(result)
+	rowsAffectedErr := NewSqlResult(result).checkRowsAffected()
 	if rowsAffectedErr != nil {
 		return fmt.Errorf("could not update plan price: %s", rowsAffectedErr)
 	}
@@ -115,7 +115,7 @@ func (p *PlanPriceRepository) Delete(entity dataobjects.PlanPrice) error {
 		return fmt.Errorf("could not delete plan price: %s", resultErr)
 	}
 
-	rowsAffectedErr := checkRowsAffected(result)
+	rowsAffectedErr := NewSqlResult(result).checkRowsAffected()
 	if rowsAffectedErr != nil {
 		return fmt.Errorf("could not delete plan price: %s", rowsAffectedErr)
 	}
@@ -165,15 +165,4 @@ func (p *PlanPriceRepository) GetAllWithPlanId(planId int) ([]dataobjects.PlanPr
 	_ = p.cache.Expire(cacheKey, planPriceCacheTtl)
 
 	return planPrices, nil
-}
-
-func checkRowsAffected(result sql.Result) error {
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("could not check rows affected: %w", err)
-	}
-	if affected == 0 {
-		return fmt.Errorf("no rows affected")
-	}
-	return nil
 }

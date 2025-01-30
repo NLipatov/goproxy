@@ -3,6 +3,7 @@ package api_ws
 import (
 	"encoding/json"
 	"fmt"
+	"goproxy/application/use_cases"
 	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure/dto"
 	"io"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/websocket"
-	"goproxy/application"
 	"goproxy/infrastructure/api/api-http/google_auth"
 )
 
@@ -20,7 +20,7 @@ const updateInterval = time.Second * 5
 
 type WSHandler struct {
 	userApiHost      string
-	planInfoUseCases application.UserPlanInfoUseCases
+	planInfoUseCases use_cases.UserPlanInfoUseCases
 	upgrader         websocket.Upgrader
 	pingPeriod       time.Duration
 	writeWait        time.Duration
@@ -28,7 +28,7 @@ type WSHandler struct {
 	maxMessageSize   int64
 }
 
-func NewWSHandler(planInfoUseCases application.UserPlanInfoUseCases, usersApiHost string) *WSHandler {
+func NewWSHandler(planInfoUseCases use_cases.UserPlanInfoUseCases, usersApiHost string) *WSHandler {
 	return &WSHandler{
 		userApiHost:      usersApiHost,
 		planInfoUseCases: planInfoUseCases,
@@ -208,11 +208,6 @@ func (w *WSHandler) readPump(conn *websocket.Conn, done chan struct{}) {
 	for {
 		_, _, err := conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket read error: %v", err)
-			} else {
-				log.Printf("WebSocket connection closed: %v", err)
-			}
 			break
 		}
 	}

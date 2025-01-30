@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/google/uuid"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/dal/cache_serialization"
 	"goproxy/dal/repositories/mocks"
 	"goproxy/domain/dataobjects"
@@ -109,7 +109,7 @@ func TestPlanLavatopOfferRepository(t *testing.T) {
 	})
 }
 
-func insertTestPlanOffers(repo application.PlanOfferRepository, planId, ploCount int, t *testing.T) []dataobjects.PlanLavatopOffer {
+func insertTestPlanOffers(repo contracts.PlanOfferRepository, planId, ploCount int, t *testing.T) []dataobjects.PlanLavatopOffer {
 	insertedPlos := make([]dataobjects.PlanLavatopOffer, ploCount)
 	for i := 0; i < ploCount; i++ {
 		offerId := fmt.Sprintf("%s", uuid.New())

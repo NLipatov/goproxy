@@ -2,7 +2,7 @@ package users
 
 import (
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/use_cases"
 	"goproxy/infrastructure/api/CORS"
 	"log"
 	"net/http"
@@ -14,7 +14,7 @@ type Controller struct {
 	port        int
 }
 
-func NewUsersController(userUseCases application.UserUseCasesContract) *Controller {
+func NewUsersController(userUseCases use_cases.UserUseCasesContract) *Controller {
 	handler := Handler{
 		userUseCases: userUseCases,
 	}

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/dal/cache_serialization"
 	"goproxy/dal/repositories/mocks"
 	"goproxy/domain/aggregates"
@@ -179,7 +179,7 @@ func TestPlansRepository(t *testing.T) {
 
 }
 
-func insertTestPlan(repo application.PlanRepository, t *testing.T) int {
+func insertTestPlan(repo contracts.PlanRepository, t *testing.T) int {
 	name := fmt.Sprintf("Test Plan %d", time.Now().UTC().UnixNano())
 	plan, err := aggregates.NewPlan(-1, name, 1000000, 30, make([]valueobjects.PlanFeature, 0))
 	assertNoError(t, err, "Failed to create test plan plan")
@@ -222,7 +222,7 @@ func assertPlansNotEqual(t *testing.T, expected, actual aggregates.Plan) {
 	}
 }
 
-func insertTestPlanWithFeatures(db *sql.DB, repo application.PlanRepository, t *testing.T, featureCount int) int {
+func insertTestPlanWithFeatures(db *sql.DB, repo contracts.PlanRepository, t *testing.T, featureCount int) int {
 	name := fmt.Sprintf("Test Plan With Features %d", time.Now().UTC().UnixNano())
 	plan, err := aggregates.NewPlan(-1, name, time.Now().UnixMilli(), time.Now().Day(), make([]valueobjects.PlanFeature, 0))
 	assertNoError(t, err, "Failed to create test plan")

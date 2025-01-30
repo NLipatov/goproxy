@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-redis/redis/v8"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"log"
 	"os"
 	"time"
@@ -16,7 +16,7 @@ type RedisCache[T any] struct {
 	client *redis.Client
 }
 
-func NewRedisCache[T any]() (application.CacheWithTTL[T], error) {
+func NewRedisCache[T any]() (contracts.CacheWithTTL[T], error) {
 	host := os.Getenv("TC_CACHE_HOST")
 	if host == "" {
 		return nil, errors.New("env variable TC_CACHE_HOST is not set")

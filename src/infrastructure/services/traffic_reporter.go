@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"goproxy/application"
+	"goproxy/application/contracts"
 	"goproxy/domain"
 	"goproxy/domain/events"
 	"goproxy/infrastructure/config"
@@ -15,7 +15,7 @@ import (
 type TrafficReporter struct {
 	mu              sync.RWMutex
 	buckets         map[int]*TrafficBucket
-	messageBus      application.MessageBusService
+	messageBus      contracts.MessageBusService
 	eventQueue      chan events.UserConsumedTrafficEvent
 	stopEventWorker chan struct{}
 }

@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 	"errors"
-	"goproxy/application"
 	"goproxy/application/aplication_errors"
+	"goproxy/application/contracts"
 	"log"
 	"math/rand"
 	"net"
@@ -20,13 +20,13 @@ type DialerPool struct {
 	randGen   *rand.Rand
 	ipPool    []net.IP
 	dialers   map[string]*net.Dialer
-	userCache application.CacheWithTTL[net.IP]
+	userCache contracts.CacheWithTTL[net.IP]
 
 	// used to resolve new public IPs assigned to server
-	ipResolver application.IPResolver
+	ipResolver contracts.IPResolver
 }
 
-func NewDialerPool(ipResolver application.IPResolver) *DialerPool {
+func NewDialerPool(ipResolver contracts.IPResolver) *DialerPool {
 	return &DialerPool{
 		ipPool:     []net.IP{},
 		dialers:    make(map[string]*net.Dialer),

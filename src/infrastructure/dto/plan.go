@@ -1,6 +1,7 @@
 package dto
 
 type PlanDto struct {
+	Id           int      `json:"id"`
 	Name         string   `json:"name"`
 	Features     []string `json:"features"`
 	DurationDays int      `json:"duration_days"`

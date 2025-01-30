@@ -8,8 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt/v4"
-	"goproxy/application"
 	"goproxy/application/commands"
+	"goproxy/application/contracts"
+	"goproxy/application/use_cases"
 	"goproxy/domain"
 	"goproxy/domain/aggregates"
 	"goproxy/domain/events"
@@ -32,15 +33,15 @@ type authData struct {
 }
 
 type GoogleAuthService struct {
-	userUseCases        application.UserUseCases
-	cryptoService       application.CryptoService
+	userUseCases        use_cases.UserUseCases
+	cryptoService       contracts.CryptoService
 	cookieBuilder       Cookie.CookieBuilder
-	cache               application.CacheWithTTL[authData]
+	cache               contracts.CacheWithTTL[authData]
 	oauthConfigProvider config.GoogleOauthConfigProvider
-	messageBus          application.MessageBusService
+	messageBus          contracts.MessageBusService
 }
 
-func NewGoogleAuthService(userUseCases application.UserUseCases, cryptoService application.CryptoService, messageBus application.MessageBusService) *GoogleAuthService {
+func NewGoogleAuthService(userUseCases use_cases.UserUseCases, cryptoService contracts.CryptoService, messageBus contracts.MessageBusService) *GoogleAuthService {
 	cache, cacheErr := services.NewRedisCache[authData]()
 	if cacheErr != nil {
 		log.Fatalf("failed to create cache instance: %s", cacheErr)
