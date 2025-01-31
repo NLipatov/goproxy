@@ -83,6 +83,15 @@ func (w *WSHandler) ServeHTTP(wr http.ResponseWriter, r *http.Request) {
 	sendUserInfo := func() bool {
 		plan, planErr := w.planInfoUseCases.FetchUserPlan(userId)
 		if planErr != nil {
+			if "sql: no rows in result set" == planErr.Error() {
+				log.Printf("user %d has no plan / user plan not found", userId)
+				_ = conn.WriteJSON(dto.ApiResponse[any]{
+					Payload:      nil,
+					ErrorCode:    403,
+					ErrorMessage: "no active plan",
+				})
+				return false
+			}
 			log.Printf("server error: %v", err)
 			_ = conn.WriteJSON(dto.ApiResponse[any]{
 				Payload:      nil,
