@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"goproxy/application/use_cases"
-	"goproxy/domain/dataobjects"
 	"goproxy/infrastructure/dto"
 	"io"
 	"log"
@@ -84,10 +83,13 @@ func (w *WSHandler) ServeHTTP(wr http.ResponseWriter, r *http.Request) {
 	sendUserInfo := func() bool {
 		plan, planErr := w.planInfoUseCases.FetchUserPlan(userId)
 		if planErr != nil {
-			plan = dataobjects.UserPlan{
-				Name:      "N/A",
-				Bandwidth: 0,
-			}
+			log.Printf("server error: %v", err)
+			_ = conn.WriteJSON(dto.ApiResponse[any]{
+				Payload:      nil,
+				ErrorCode:    500,
+				ErrorMessage: "not available",
+			})
+			return false
 		}
 
 		traffic, trafficErr := w.planInfoUseCases.FetchTrafficUsage(userId)
@@ -97,7 +99,9 @@ func (w *WSHandler) ServeHTTP(wr http.ResponseWriter, r *http.Request) {
 
 		response := dto.ApiResponse[dto.Plan]{
 			Payload: &dto.Plan{
-				Name: plan.Name,
+				Name:         plan.Name,
+				CreatedAt:    plan.CreatedAt,
+				DurationDays: plan.DurationDays,
 				Limits: dto.Limits{
 					Bandwidth: dto.BandwidthLimit{
 						IsLimited: plan.Bandwidth != 0,
