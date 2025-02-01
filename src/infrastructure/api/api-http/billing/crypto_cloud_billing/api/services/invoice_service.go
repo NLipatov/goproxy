@@ -7,6 +7,7 @@ import (
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
 	"goproxy/domain/dataobjects"
 	"goproxy/domain/valueobjects"
+	"goproxy/infrastructure/api/api-http/billing"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/api/dto"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_api_dto"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_currencies"
@@ -22,13 +23,13 @@ type BillingService struct {
 	orderRepository     contracts.OrderRepository
 	planPriceRepository contracts.PlanPriceRepository
 	paymentService      crypto_cloud.PaymentProvider
-	messageBusService   CryptoCloudMessageBusService
+	messageBusService   billing.MessageBusProducer
 }
 
 func NewBillingService(orderRepository contracts.OrderRepository,
 	planPriceRepository contracts.PlanPriceRepository,
 	paymentService crypto_cloud.PaymentProvider,
-	messageBusService CryptoCloudMessageBusService) BillingService {
+	messageBusService billing.MessageBusProducer) BillingService {
 	return BillingService{
 		orderRepository:     orderRepository,
 		planPriceRepository: planPriceRepository,
