@@ -1,7 +1,6 @@
 package services
 
 import (
-	"encoding/json"
 	"fmt"
 	"goproxy/application/contracts"
 	"goproxy/application/payments/crypto_cloud"
@@ -9,10 +8,15 @@ import (
 	"goproxy/domain/dataobjects"
 	"goproxy/domain/valueobjects"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/api/dto"
+	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_api_dto"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_currencies"
-	"log"
-	"net/http"
 )
+
+type IssueInvoiceResult struct {
+	IsPaymentRequired bool
+	Invoice           crypto_cloud_api_dto.InvoiceResponse
+	PaymentLinq       string
+}
 
 type BillingService struct {
 	orderRepository     contracts.OrderRepository
@@ -33,25 +37,42 @@ func NewBillingService(orderRepository contracts.OrderRepository,
 	}
 }
 
-func (h *BillingService) IssueInvoice(w http.ResponseWriter, dto dto.IssueInvoiceCommandDto) {
+func (h *BillingService) IssueInvoice(dto dto.IssueInvoiceCommandDto) (IssueInvoiceResult, error) {
 	currency, amount, planPriceErr := h.getPlanPrice(dto.PlanId, dto.Currency)
 	if planPriceErr != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte("could not load plan prices"))
-		return
+		return IssueInvoiceResult{}, planPriceErr
 	}
 
 	emailValueObject, emailValidationErr := valueobjects.ParseEmailFromString(dto.Email)
 	if emailValidationErr != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte("invalid email"))
-		return
+		return IssueInvoiceResult{}, emailValidationErr
 	}
 
 	if amount == 0 {
-		h.handleFreePlan(w, dto.PlanId, emailValueObject)
+		handlingErr := h.handleFreePlan(dto.PlanId, emailValueObject)
+		if handlingErr != nil {
+			return IssueInvoiceResult{}, handlingErr
+		}
+
+		return IssueInvoiceResult{
+			IsPaymentRequired: false,
+			Invoice:           crypto_cloud_api_dto.InvoiceResponse{},
+			PaymentLinq:       "",
+		}, handlingErr
 	} else {
-		h.handlePaidPlan(w, dto.PlanId, emailValueObject, amount, currency)
+		response, responseErr := h.handlePaidPlan(dto.PlanId, emailValueObject, amount, currency)
+		if responseErr != nil {
+			return IssueInvoiceResult{
+				IsPaymentRequired: true,
+				Invoice:           crypto_cloud_api_dto.InvoiceResponse{},
+				PaymentLinq:       "",
+			}, responseErr
+		}
+		return IssueInvoiceResult{
+			IsPaymentRequired: true,
+			Invoice:           response,
+			PaymentLinq:       response.Result.Link,
+		}, nil
 	}
 }
 
@@ -76,14 +97,12 @@ func (h *BillingService) getPlanPrice(planId int, preferredCurrencyCode string) 
 	return crypto_cloud_currencies.NewCryptoCloudCurrency(prices[0].Currency()), float64(prices[0].Cents()) / 100.0, pricesErr
 }
 
-func (h *BillingService) handlePaidPlan(w http.ResponseWriter, planId int, emailVO valueobjects.Email, amount float64, currency crypto_cloud_currencies.CryptoCloudCurrency) {
+func (h *BillingService) handlePaidPlan(planId int, emailVO valueobjects.Email, amount float64, currency crypto_cloud_currencies.CryptoCloudCurrency) (crypto_cloud_api_dto.InvoiceResponse, error) {
 	orderId, orderErr := h.orderRepository.
 		Create(dataobjects.
 			NewOrder(-1, emailVO, planId, valueobjects.NewOrderStatus("NEW")))
 	if orderErr != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte("could not create order"))
-		return
+		return crypto_cloud_api_dto.InvoiceResponse{}, orderErr
 	}
 
 	cmd := crypto_cloud_commands.IssueInvoiceCommand{
@@ -95,42 +114,32 @@ func (h *BillingService) handlePaidPlan(w http.ResponseWriter, planId int, email
 
 	result, resultErr := h.paymentService.IssueInvoice(cmd)
 	if resultErr != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte("invalid request body"))
-		return
+		return crypto_cloud_api_dto.InvoiceResponse{}, resultErr
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
-	return
+	return result.(crypto_cloud_api_dto.InvoiceResponse), nil
 }
 
-func (h *BillingService) handleFreePlan(w http.ResponseWriter, planId int, emailVO valueobjects.Email) {
+func (h *BillingService) handleFreePlan(planId int, emailVO valueobjects.Email) error {
 	//check eligibility
 	eligible := h.IsUserEligibleForFreePlan(planId, emailVO)
 	if !eligible {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte("not eligible for free plan"))
-		return
+		return fmt.Errorf("not eligible for free plan")
 	}
 
 	// create new order
 	_, newPlanOrder := h.orderRepository.
 		Create(dataobjects.NewOrder(-1, emailVO, planId, valueobjects.NewOrderStatus("NEW")))
 	if newPlanOrder != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte("could not create order"))
-		return
+		return fmt.Errorf("could not create order: %s", newPlanOrder)
 	}
 
 	produceEventErr := h.messageBusService.ProducePlanAssignedEvent(planId, emailVO.String())
 	if produceEventErr != nil {
-		log.Printf("could not produce plan assigned event: %v", produceEventErr)
+		return fmt.Errorf("could not produce event: %s", produceEventErr)
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	return
+	return nil
 }
 
 func (h *BillingService) IsUserEligibleForFreePlan(planId int, emailVO valueobjects.Email) bool {
