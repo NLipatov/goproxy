@@ -2,7 +2,8 @@ package free_plan_billing
 
 import (
 	"encoding/json"
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/api/dto"
+	"goproxy/domain/valueobjects"
+	"goproxy/infrastructure/api/api-http/billing/free_plan_billing/free_plan_billing_dtos"
 	"goproxy/infrastructure/api/api-http/http_objects"
 	dto2 "goproxy/infrastructure/dto"
 	"net/http"
@@ -18,74 +19,63 @@ func NewHandler(service *Service) Handler {
 	}
 }
 
-func (c *Handler) Handle(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		h.respondError(w, http.StatusMethodNotAllowed, "")
 		return
 	}
 
 	userRequest := http_objects.NewAuthenticatedUserBillingRequest(r)
 	email, emailErr := userRequest.UserEmail()
 	if emailErr != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		jsonResponse := http_objects.NewJSONResponse[dto2.ApiResponse[dto.CreateInvoiceResponse]](w)
-		_ = jsonResponse.Respond(dto2.ApiResponse[dto.CreateInvoiceResponse]{
-			Payload:      nil,
-			ErrorCode:    401,
-			ErrorMessage: "invalid token",
-		})
+		h.respondError(w, http.StatusUnauthorized, "")
 		return
 	}
 
-	var requestDto dto.IssueInvoiceCommandDto
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 512))
+	emailVO, emailVOErr := valueobjects.ParseEmailFromString(email)
+	if emailVOErr != nil {
+		h.respondError(w, http.StatusUnauthorized, "invalid email")
+		return
+	}
+
+	var requestDto free_plan_billing_dtos.Request
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64))
 	if err := decoder.Decode(&requestDto); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		jsonResponse := http_objects.NewJSONResponse[dto2.ApiResponse[InvoiceResponse]](w)
-		_ = jsonResponse.Respond(dto2.ApiResponse[InvoiceResponse]{
-			Payload: &InvoiceResponse{
-				PlanAssigned: false,
-			},
-			ErrorCode:    400,
-			ErrorMessage: "invalid body",
-		})
+		h.respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	requestDto.Email = email
-
-	handleErr := c.service.handle(requestDto)
+	handleErr := h.service.handle(emailVO, requestDto.PlanId)
 	if handleErr != nil {
 		if handleErr.Error() == "not eligible for free plan" {
-			w.WriteHeader(http.StatusBadRequest)
-			jsonResponse := http_objects.NewJSONResponse[dto2.ApiResponse[InvoiceResponse]](w)
-			_ = jsonResponse.Respond(dto2.ApiResponse[InvoiceResponse]{
-				Payload: &InvoiceResponse{
-					PlanAssigned: false,
-				},
-				ErrorCode:    400,
-				ErrorMessage: "you are not allowed to assign this plan more than once",
-			})
+			h.respondError(w, http.StatusBadRequest, "free plan can only be activated once")
 			return
 		}
-		w.WriteHeader(http.StatusInternalServerError)
-		jsonResponse := http_objects.NewJSONResponse[dto2.ApiResponse[InvoiceResponse]](w)
-		_ = jsonResponse.Respond(dto2.ApiResponse[InvoiceResponse]{
-			Payload: &InvoiceResponse{
-				PlanAssigned: false,
-			},
-			ErrorCode:    500,
-			ErrorMessage: "server failed to process request",
-		})
+
+		h.respondError(w, http.StatusInternalServerError, "")
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	jsonResponse := http_objects.NewJSONResponse[dto2.ApiResponse[InvoiceResponse]](w)
-	_ = jsonResponse.Respond(dto2.ApiResponse[InvoiceResponse]{
-		Payload: &InvoiceResponse{
-			PlanAssigned: true,
+	h.respond(w, free_plan_billing_dtos.Response{PlanAssigned: true})
+}
+
+func (h *Handler) respondError(w http.ResponseWriter, statusCode int, msg string) {
+	w.WriteHeader(statusCode)
+	jsonResponse := http_objects.NewJSONResponse[dto2.ApiResponse[free_plan_billing_dtos.Response]](w)
+	_ = jsonResponse.Respond(dto2.ApiResponse[free_plan_billing_dtos.Response]{
+		Payload: &free_plan_billing_dtos.Response{
+			PlanAssigned: false,
 		},
+		ErrorCode:    0,
+		ErrorMessage: msg,
+	})
+}
+
+func (h *Handler) respond(w http.ResponseWriter, response free_plan_billing_dtos.Response) {
+	w.WriteHeader(http.StatusOK)
+	jsonResponse := http_objects.NewJSONResponse[dto2.ApiResponse[free_plan_billing_dtos.Response]](w)
+	_ = jsonResponse.Respond(dto2.ApiResponse[free_plan_billing_dtos.Response]{
+		Payload:      &response,
 		ErrorCode:    0,
 		ErrorMessage: "",
 	})

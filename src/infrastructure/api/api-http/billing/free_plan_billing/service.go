@@ -6,7 +6,6 @@ import (
 	"goproxy/domain/dataobjects"
 	"goproxy/domain/valueobjects"
 	"goproxy/infrastructure/api/api-http/billing"
-	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/api/dto"
 )
 
 type Service struct {
@@ -21,27 +20,21 @@ func NewService(orderRepository contracts.OrderRepository, messageBusProducer co
 	}
 }
 
-func (s *Service) handle(dto dto.IssueInvoiceCommandDto) error {
-	planId := dto.PlanId
-	emailVO, emailVOErr := valueobjects.ParseEmailFromString(dto.Email)
-	if emailVOErr != nil {
-		return emailVOErr
-	}
-
+func (s *Service) handle(email valueobjects.Email, planId int) error {
 	//check eligibility
-	eligible := s.IsUserEligibleForFreePlan(planId, emailVO)
+	eligible := s.IsUserEligibleForFreePlan(planId, email)
 	if !eligible {
 		return fmt.Errorf("not eligible for free plan")
 	}
 
 	// create new order
 	_, newPlanOrder := s.orderRepository.
-		Create(dataobjects.NewOrder(-1, emailVO, planId, valueobjects.NewOrderStatus("NEW")))
+		Create(dataobjects.NewOrder(-1, email, planId, valueobjects.NewOrderStatus("NEW")))
 	if newPlanOrder != nil {
 		return fmt.Errorf("could not create order: %s", newPlanOrder)
 	}
 
-	produceEventErr := s.messageBusService.ProducePlanAssignedEvent(planId, emailVO.String())
+	produceEventErr := s.messageBusService.ProducePlanAssignedEvent(planId, email.String())
 	if produceEventErr != nil {
 		return fmt.Errorf("could not produce event: %s", produceEventErr)
 	}
