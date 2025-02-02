@@ -1,5 +1,5 @@
 package dto
 
-type CreateInvoiceResponse struct {
+type Response struct {
 	PaymentLink string `json:"payment_link"`
 }
