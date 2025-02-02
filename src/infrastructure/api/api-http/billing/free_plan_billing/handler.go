@@ -66,7 +66,7 @@ func (h *Handler) respondError(w http.ResponseWriter, statusCode int, msg string
 		Payload: &free_plan_billing_dtos.Response{
 			PlanAssigned: false,
 		},
-		ErrorCode:    0,
+		ErrorCode:    statusCode,
 		ErrorMessage: msg,
 	})
 }
