@@ -11,10 +11,10 @@ services:
     hostname: proxy-cockroach
     command: >
       start-single-node
-      --advertise-addr=proxy-cockroach:26357 
-      --http-addr=proxy-cockroach:8080 
-      --listen-addr=localhost:26257 
-      --sql-addr=proxy-cockroach:26257 
+      --advertise-addr=proxy-cockroach:26357
+      --http-addr=proxy-cockroach:8080
+      --listen-addr=localhost:26257
+      --sql-addr=proxy-cockroach:26257
       --insecure
     ports:
       - "26257:26257"
@@ -27,20 +27,25 @@ services:
       timeout: 5s
       retries: 5
         
-  plan-postgres:
-    image: postgres:17.2-bookworm
-    container_name: plan-postgres
-    environment:
-      POSTGRES_USER: ${PLANS_DB_USER}
-      POSTGRES_PASSWORD: ${PLANS_DB_PASS}
-      POSTGRES_DB: ${PLANS_DB_DATABASE}
+  plans-cockroach:
+    image: cockroachdb/cockroach:v24.3.5
+    container_name: plans-cockroach
+    hostname: plans-cockroach
+    command: >
+      start-single-node
+      --advertise-addr=plans-cockroach:26357
+      --http-addr=plans-cockroach:8080
+      --listen-addr=localhost:26257
+      --sql-addr=plans-cockroach:26257
+      --insecure
     ports:
-      - "5434:5432"
+      - "26258:26257"
+      - "8081:8080"
     volumes:
-      - plan-proxy-postgres-data:/var/lib/postgresql/data
+      - plans-cockroach-data:/cockroach/cockroach-data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
-      interval: 10s
+      test: ["CMD-SHELL", "cockroach node status --insecure --host=plans-cockroach:26257"]
+      interval: 1s
       timeout: 5s
       retries: 5
   
@@ -77,10 +82,10 @@ services:
       proxy-cockroach:
         condition: service_healthy
 
-  plans-ctx-migrator:
+  plans-cockroach-migrator:
     build:
       context: ./src
-    container_name: plans-ctx-migrator
+    container_name: plans-cockroach-migrator
     environment:
       - MODE=migrator
       - DB_DATABASE=${PLANS_DB_DATABASE}
@@ -89,7 +94,7 @@ services:
       - DB_HOST=${PLANS_DB_HOST}
       - DB_PORT=${PLANS_DB_PORT}
     depends_on:
-      plan-postgres:
+      plans-cockroach:
         condition: service_healthy
 
   billing-ctx-migrator:
@@ -167,7 +172,7 @@ services:
     depends_on:
       init-kafka-topics:
           condition: service_completed_successfully
-      proxy-ctx-migrator:
+      proxy-cockroach-migrator:
         condition: service_completed_successfully
 
   rest-api:
@@ -190,7 +195,7 @@ services:
       - PROXY_KAFKA_TOPIC=${USERS_REST_API_KAFKA_TOPIC} 
       - ALLOWED_ORIGINS=*
     depends_on:
-      - proxy-ctx-migrator
+      - proxy-cockroach-migrator
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.8.0
@@ -435,7 +440,7 @@ services:
     depends_on:
       init-kafka-topics:
         condition: service_completed_successfully
-      plan-postgres:
+      plans-cockroach:
         condition: service_healthy
       kafka:
         condition: service_healthy
@@ -443,8 +448,8 @@ services:
         condition: service_healthy
 
 volumes:
-  plan-proxy-postgres-data: 
   billing-proxy-postgres-data:
   plan-controller-cache-data:
   billing-cache-data: 
-  proxy-cockroach-data:
+  proxy-cockroach-data: 
+  plans-cockroach-data:
