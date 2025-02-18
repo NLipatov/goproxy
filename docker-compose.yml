@@ -49,20 +49,25 @@ services:
       timeout: 5s
       retries: 5
   
-  billing-postgres:
-    image: postgres:17.2-bookworm
-    container_name: lavatop-billing-postgres
-    environment:
-      POSTGRES_USER: ${BILLING_DB_USER}
-      POSTGRES_PASSWORD: ${BILLING_DB_PASS}
-      POSTGRES_DB: ${BILLING_DB_DATABASE}
+  billing-cockroach:
+    image: cockroachdb/cockroach:v24.3.5
+    container_name: billing-cockroach
+    hostname: billing-cockroach
+    command: >
+      start-single-node
+      --advertise-addr=billing-cockroach:26357
+      --http-addr=billing-cockroach:8080
+      --listen-addr=localhost:26257
+      --sql-addr=billing-cockroach:26257
+      --insecure
     ports:
-      - "5435:5432"
+      - "26259:26257"
+      - "8082:8080"
     volumes:
-      - billing-proxy-postgres-data:/var/lib/postgresql/data
+      - billing-cockroach-data:/cockroach/cockroach-data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
-      interval: 10s
+      test: ["CMD-SHELL", "cockroach node status --insecure --host=billing-cockroach:26257"]
+      interval: 1s
       timeout: 5s
       retries: 5
   
@@ -97,10 +102,10 @@ services:
       plans-cockroach:
         condition: service_healthy
 
-  billing-ctx-migrator:
+  billing-cockroach-migrator:
     build:
       context: ./src
-    container_name: billing-ctx-migrator
+    container_name: billing-cockroach-migrator
     environment:
       - MODE=migrator
       - DB_DATABASE=${BILLING_DB_DATABASE}
@@ -109,7 +114,7 @@ services:
       - DB_HOST=${BILLING_DB_HOST}
       - DB_PORT=${BILLING_DB_PORT}
     depends_on:
-      billing-postgres:
+      billing-cockroach:
         condition: service_healthy
   
   # Services
@@ -312,7 +317,7 @@ services:
     depends_on:
       init-kafka-topics:
         condition: service_completed_successfully
-      billing-postgres:
+      billing-cockroach:
         condition: service_healthy
       kafka:
         condition: service_healthy
@@ -448,8 +453,8 @@ services:
         condition: service_healthy
 
 volumes:
-  billing-proxy-postgres-data:
   plan-controller-cache-data:
   billing-cache-data: 
   proxy-cockroach-data: 
   plans-cockroach-data:
+  billing-cockroach-data:

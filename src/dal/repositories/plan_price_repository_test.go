@@ -24,7 +24,7 @@ func TestPlanPriceRepository(t *testing.T) {
 		_ = os.Unsetenv("DB_DATABASE")
 	}()
 
-	db, cleanup := prepareDb(t)
+	db, cleanup := prepareCockroachDB(t)
 	defer cleanup()
 	defer func(db *sql.DB) {
 		_ = db.Close()
