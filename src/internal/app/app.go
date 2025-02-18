@@ -31,11 +31,12 @@ func (app *App) Run(ctx context.Context) error {
 		modules.NewGoogleAuthAPI().Start()
 	case "plans-api":
 		modules.NewPlansAPI().Start()
-	case "billing-api":
+	case "billing-api": // ToDo: rename to billing-prices-api ?
 		modules.NewBillingAPI().Start()
 	case "crypto-cloud-billing-api":
 		modules.NewCryptoCloudBillingAPI().Start()
-
+	case "free-plan-billing-api":
+		modules.NewFreePlanBillingAPI().Start()
 	default:
 		return fmt.Errorf("unsupported mode: %s", app.config.Mode)
 	}

@@ -90,7 +90,7 @@ func (c *CreateInvoiceHandler) HandleCreateInvoice(command crypto_cloud_commands
 		return nil, errors.New("failed to create invoice: API error")
 	}
 
-	return response.Result, nil
+	return response, nil
 }
 
 func formatErrorResult(result map[string]interface{}) string {

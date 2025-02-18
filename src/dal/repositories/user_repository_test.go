@@ -14,7 +14,7 @@ import (
 const sampleValidArgon2idHash = "$argon2id$v=19$m=65536,t=3,p=2$c29tZXNhbHQ$RdescudvJCsgt3ub+b+dWRWJTmaaJObG"
 
 func TestUserRepository(t *testing.T) {
-	setEnvErr := os.Setenv("DB_DATABASE", "proxydb")
+	setEnvErr := os.Setenv("DB_DATABASE", "proxy")
 	if setEnvErr != nil {
 		t.Fatal(setEnvErr)
 	}
@@ -23,7 +23,7 @@ func TestUserRepository(t *testing.T) {
 		_ = os.Unsetenv("DB_DATABASE")
 	}()
 
-	db, cleanup := prepareDb(t)
+	db, cleanup := prepareCockroachDB(t)
 	defer cleanup()
 	defer func(db *sql.DB) {
 		_ = db.Close()

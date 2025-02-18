@@ -43,8 +43,10 @@ func (u *UserPlanInfoUseCases) FetchUserPlan(userId int) (dataobjects.UserPlan, 
 	}
 
 	userPlanData := dataobjects.UserPlan{
-		Name:      plan.Name(),
-		Bandwidth: plan.LimitBytes(),
+		Name:         plan.Name(),
+		Bandwidth:    plan.LimitBytes(),
+		CreatedAt:    plan.CreatedAt(),
+		DurationDays: plan.DurationDays(),
 	}
 
 	cacheSetErr := u.planCache.Set(u.cachePlanKey(userId), userPlanData)

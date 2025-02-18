@@ -5,6 +5,7 @@ import (
 	"goproxy/application/contracts"
 	"goproxy/application/payments/crypto_cloud"
 	"goproxy/application/payments/crypto_cloud/crypto_cloud_commands"
+	"goproxy/infrastructure/api/api-http/billing"
 	"goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/crypto_cloud_api/crypto_cloud_api_dto"
 	"log"
 	"net/http"
@@ -16,13 +17,13 @@ type PostbackService struct {
 	orderRepository     contracts.OrderRepository
 	planPriceRepository contracts.PlanPriceRepository
 	paymentService      crypto_cloud.PaymentProvider
-	messageBusService   CryptoCloudMessageBusService
+	messageBusService   billing.MessageBusProducer
 }
 
 func NewPostbackService(orderRepository contracts.OrderRepository,
 	planPriceRepository contracts.PlanPriceRepository,
 	paymentService crypto_cloud.PaymentProvider,
-	messageBusService CryptoCloudMessageBusService) PostbackService {
+	messageBusService billing.MessageBusProducer) PostbackService {
 	return PostbackService{
 		orderRepository:     orderRepository,
 		planPriceRepository: planPriceRepository,

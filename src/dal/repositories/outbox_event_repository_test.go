@@ -9,7 +9,7 @@ import (
 )
 
 func TestDomainEventRepository(t *testing.T) {
-	setEnvErr := os.Setenv("DB_DATABASE", "proxydb")
+	setEnvErr := os.Setenv("DB_DATABASE", "proxy")
 	if setEnvErr != nil {
 		t.Fatal(setEnvErr)
 	}
@@ -18,7 +18,7 @@ func TestDomainEventRepository(t *testing.T) {
 		_ = os.Unsetenv("DB_DATABASE")
 	}()
 
-	db, cleanup := prepareDb(t)
+	db, cleanup := prepareCockroachDB(t)
 	defer cleanup()
 	defer func(db *sql.DB) {
 		_ = db.Close()

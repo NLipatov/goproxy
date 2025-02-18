@@ -1,7 +1,6 @@
 package dto
 
-type IssueInvoiceCommandDto struct {
+type Request struct {
 	PlanId   int    `json:"plan_id"`
 	Currency string `json:"currency"`
-	Email    string `json:"email"`
 }

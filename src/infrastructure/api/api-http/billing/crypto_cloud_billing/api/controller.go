@@ -5,6 +5,7 @@ import (
 	"goproxy/application/contracts"
 	"goproxy/application/payments/crypto_cloud"
 	"goproxy/infrastructure/api/CORS"
+	"goproxy/infrastructure/api/api-http/billing"
 	handlers2 "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/api/handlers"
 	services2 "goproxy/infrastructure/api/api-http/billing/crypto_cloud_billing/api/services"
 	"log"
@@ -21,7 +22,7 @@ type Controller struct {
 func NewController(cryptoCloudService crypto_cloud.PaymentProvider,
 	planPriceRepository contracts.PlanPriceRepository, orderRepository contracts.OrderRepository,
 	messageBus contracts.MessageBusService) *Controller {
-	cryptoCloudMessageBusService := services2.NewCryptoCloudMessageBusService(messageBus)
+	cryptoCloudMessageBusService := billing.NewMessageBusProducer(messageBus)
 	billingService := services2.NewBillingService(orderRepository, planPriceRepository, cryptoCloudService, cryptoCloudMessageBusService)
 	postbackService := services2.NewPostbackService(orderRepository, planPriceRepository, cryptoCloudService, cryptoCloudMessageBusService)
 	return &Controller{
@@ -40,6 +41,6 @@ func (c *Controller) Listen(port int) {
 
 	corsHandler := c.corsManager.AddCORS(mux)
 
-	log.Println(fmt.Sprintf("Server is running on port %d", c.port))
+	log.Println(fmt.Sprintf("crypto cloud controller is listening on port %d", c.port))
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", c.port), corsHandler))
 }

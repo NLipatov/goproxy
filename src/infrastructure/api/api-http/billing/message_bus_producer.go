@@ -1,4 +1,4 @@
-package services
+package billing
 
 import (
 	"encoding/json"
@@ -9,17 +9,17 @@ import (
 	"time"
 )
 
-type CryptoCloudMessageBusService struct {
+type MessageBusProducer struct {
 	messageBus contracts.MessageBusService
 }
 
-func NewCryptoCloudMessageBusService(messageBus contracts.MessageBusService) CryptoCloudMessageBusService {
-	return CryptoCloudMessageBusService{
+func NewMessageBusProducer(messageBus contracts.MessageBusService) MessageBusProducer {
+	return MessageBusProducer{
 		messageBus: messageBus,
 	}
 }
 
-func (m *CryptoCloudMessageBusService) ProducePlanAssignedEvent(planId int, email string) error {
+func (m *MessageBusProducer) ProducePlanAssignedEvent(planId int, email string) error {
 	event := events.NewPlanAssigned(email, planId, time.Now().UTC())
 	eventJson, eventJsonErr := json.Marshal(event)
 	if eventJsonErr != nil {

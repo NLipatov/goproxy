@@ -1,5 +1,7 @@
 package dto
 
+import "time"
+
 type PlanDto struct {
 	Id           int      `json:"id"`
 	Name         string   `json:"name"`
@@ -12,6 +14,7 @@ type Plan struct {
 	Limits       Limits    `json:"limits"`
 	Features     []Feature `json:"features"`
 	DurationDays int       `json:"duration_days"`
+	CreatedAt    time.Time `json:"created_at"`
 	Offers       []Offer   `json:"offers"`
 }
 
@@ -39,17 +42,17 @@ type Limits struct {
 }
 
 type BandwidthLimit struct {
-	IsLimited bool  `json:"isLimited"`
+	IsLimited bool  `json:"is_limited"`
 	Used      int64 `json:"used"`
 	Total     int64 `json:"total"`
 }
 
 type ConnectionLimit struct {
-	IsLimited                bool `json:"isLimited"`
-	MaxConcurrentConnections int  `json:"maxConcurrentConnections"`
+	IsLimited                bool `json:"is_limited"`
+	MaxConcurrentConnections int  `json:"max_concurrent_connections"`
 }
 
 type SpeedLimit struct {
-	IsLimited         bool  `json:"isLimited"`
-	MaxBytesPerSecond int64 `json:"maxBytesPerSecond"`
+	IsLimited         bool  `json:"is_limited"`
+	MaxBytesPerSecond int64 `json:"max_bytes_per_second"`
 }

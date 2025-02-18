@@ -57,6 +57,6 @@ func (*CloudBillingAPI) Start() {
 	orderRepository := repositories.NewOrderRepository(db)
 
 	cryptoCloudService := crypto_cloud_api.NewCryptoCloudService(messageBusService)
-	restController := api.NewController(cryptoCloudService, planPriceRepository, orderRepository, messageBusService)
-	restController.Listen(port)
+	cryptoCloudServiceController := api.NewController(cryptoCloudService, planPriceRepository, orderRepository, messageBusService)
+	cryptoCloudServiceController.Listen(port)
 }
