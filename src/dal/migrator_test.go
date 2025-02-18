@@ -18,7 +18,7 @@ func TestMigrate(t *testing.T) {
 		_ = os.Unsetenv("DB_DATABASE")
 	}()
 
-	_, db, cleanup := SetupPostgresContainer(t)
+	_, db, cleanup := SetupCockroachContainer(t)
 	defer cleanup()
 	defer func(db *sql.DB) {
 		_ = db.Close()

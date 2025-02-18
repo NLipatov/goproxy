@@ -5,22 +5,42 @@ networks:
 
 services:
   # DBs
-  proxy-postgres:
-    image: postgres:17.2-bookworm
-    container_name: proxy-postgres
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASS}
-      POSTGRES_DB: ${DB_DATABASE}
+  proxy-cockroach:
+    image: cockroachdb/cockroach:v24.3.5
+    container_name: proxy-cockroach
+    hostname: proxy-cockroach
+    command: >
+      start-single-node
+      --advertise-addr=proxy-cockroach:26357 
+      --http-addr=proxy-cockroach:8080 
+      --listen-addr=localhost:26257 
+      --sql-addr=proxy-cockroach:26257 
+      --insecure
     ports:
-      - "5432:5432"
+      - "26257:26257"
+      - "8080:8080"
     volumes:
-      - proxy-postgres-data:/var/lib/postgresql/data
+      - proxy-cockroach-data:/cockroach/cockroach-data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
-      interval: 10s
+      test: ["CMD-SHELL", "cockroach node status --insecure --host=proxy-cockroach:26257"]
+      interval: 1s
       timeout: 5s
       retries: 5
+      
+  proxy-cockroach-migrator:
+    build:
+      context: ./src
+    container_name: proxy-cockroach-migrator
+    environment:
+      - MODE=migrator
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+    depends_on:
+      proxy-cockroach:
+        condition: service_healthy
         
   plan-postgres:
     image: postgres:17.2-bookworm
@@ -69,7 +89,7 @@ services:
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
     depends_on:
-      proxy-postgres:
+      proxy-cockroach:
         condition: service_healthy
 
   plans-ctx-migrator:
@@ -131,7 +151,7 @@ services:
       - TC_CACHE_PORT=${TC_CACHE_PORT}
       - TC_CACHE_USER=${TC_CACHE_USER}
     depends_on:
-      proxy-postgres:
+      proxy-cockroach:
         condition: service_healthy
       plan-controller-cache:
         condition: service_healthy
@@ -422,7 +442,6 @@ services:
       - PROXY_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - PROXY_KAFKA_GROUP_ID=${PROXY_KAFKA_GROUP_ID}
       - PROXY_KAFKA_AUTO_OFFSET_RESET=${PROXY_KAFKA_AUTO_OFFSET_RESET}
-      - PROXY_KAFKA_TOPIC=${PROXY_KAFKA_TOPIC}
       - TC_CACHE_HOST=${TC_CACHE_HOST}
       - TC_CACHE_PORT=${TC_CACHE_PORT}
       - TC_CACHE_USER=${TC_CACHE_USER}
@@ -439,8 +458,8 @@ services:
         condition: service_healthy
 
 volumes:
-  proxy-postgres-data:
   plan-proxy-postgres-data: 
   billing-proxy-postgres-data:
   plan-controller-cache-data:
-  billing-cache-data:
+  billing-cache-data: 
+  proxy-cockroach-data:

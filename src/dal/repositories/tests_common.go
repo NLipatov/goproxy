@@ -28,6 +28,13 @@ func assertJSONEqual(t *testing.T, expected, actual string) {
 	}
 }
 
+func prepareCockroachDB(t *testing.T) (*sql.DB, func()) {
+	_, db, cleanup := dal.SetupCockroachContainer(t)
+	dal.Migrate(db)
+
+	return db, cleanup
+}
+
 func prepareDb(t *testing.T) (*sql.DB, func()) {
 	_, db, cleanup := dal.SetupPostgresContainer(t)
 	dal.Migrate(db)
