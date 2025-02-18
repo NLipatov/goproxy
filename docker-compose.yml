@@ -26,21 +26,6 @@ services:
       interval: 1s
       timeout: 5s
       retries: 5
-      
-  proxy-cockroach-migrator:
-    build:
-      context: ./src
-    container_name: proxy-cockroach-migrator
-    environment:
-      - MODE=migrator
-      - DB_DATABASE=${DB_DATABASE}
-      - DB_USER=${DB_USER}
-      - DB_PASS=${DB_PASS}
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-    depends_on:
-      proxy-cockroach:
-        condition: service_healthy
         
   plan-postgres:
     image: postgres:17.2-bookworm
@@ -77,10 +62,10 @@ services:
       retries: 5
   
   # DB migrators
-  proxy-ctx-migrator:
+  proxy-cockroach-migrator:
     build:
       context: ./src
-    container_name: proxy-ctx-migrator
+    container_name: proxy-cockroach-migrator
     environment:
       - MODE=migrator
       - DB_DATABASE=${DB_DATABASE}
