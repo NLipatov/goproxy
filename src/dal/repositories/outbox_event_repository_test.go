@@ -9,7 +9,7 @@ import (
 )
 
 func TestDomainEventRepository(t *testing.T) {
-	setEnvErr := os.Setenv("DB_DATABASE", "proxydb")
+	setEnvErr := os.Setenv("DB_DATABASE", "proxy")
 	if setEnvErr != nil {
 		t.Fatal(setEnvErr)
 	}
